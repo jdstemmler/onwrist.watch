@@ -76,6 +76,45 @@
 </section>
 
 <style>
+	/* Single source of truth for the chart series palette — every chart
+	   component's root element carries class="chart-palette" and only
+	   references var(--series-N) (see slotVar() in
+	   $lib/components/charts/palette.ts); the values are declared once here
+	   instead of being copy-pasted into each component's local <style> block.
+	   Must stay in sync with CATEGORICAL in palette.ts. */
+	:global(.chart-palette) {
+		--series-1: #2a78d6;
+		--series-2: #008300;
+		--series-3: #e87ba4;
+		--series-4: #eda100;
+		--series-5: #1baf7a;
+		--series-6: #eb6834;
+		--series-7: #4a3aa7;
+		--series-8: #e34948;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:where(:not([data-theme='light'])) :global(.chart-palette) {
+			--series-1: #3987e5;
+			--series-2: #008300;
+			--series-3: #d55181;
+			--series-4: #c98500;
+			--series-5: #199e70;
+			--series-6: #d95926;
+			--series-7: #9085e9;
+			--series-8: #e66767;
+		}
+	}
+	:root[data-theme='dark'] :global(.chart-palette) {
+		--series-1: #3987e5;
+		--series-2: #008300;
+		--series-3: #d55181;
+		--series-4: #c98500;
+		--series-5: #199e70;
+		--series-6: #d95926;
+		--series-7: #9085e9;
+		--series-8: #e66767;
+	}
+
 	.tiles {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));

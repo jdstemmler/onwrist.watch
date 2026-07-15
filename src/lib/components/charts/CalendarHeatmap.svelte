@@ -116,38 +116,9 @@
 </div>
 
 <style>
-	.chart-palette {
-		--series-1: #2a78d6;
-		--series-2: #008300;
-		--series-3: #e87ba4;
-		--series-4: #eda100;
-		--series-5: #1baf7a;
-		--series-6: #eb6834;
-		--series-7: #4a3aa7;
-		--series-8: #e34948;
-	}
-	@media (prefers-color-scheme: dark) {
-		:root:where(:not([data-theme='light'])) .chart-palette {
-			--series-1: #3987e5;
-			--series-2: #008300;
-			--series-3: #d55181;
-			--series-4: #c98500;
-			--series-5: #199e70;
-			--series-6: #d95926;
-			--series-7: #9085e9;
-			--series-8: #e66767;
-		}
-	}
-	:root[data-theme='dark'] .chart-palette {
-		--series-1: #3987e5;
-		--series-2: #008300;
-		--series-3: #d55181;
-		--series-4: #c98500;
-		--series-5: #199e70;
-		--series-6: #d95926;
-		--series-7: #9085e9;
-		--series-8: #e66767;
-	}
+	/* dataviz palette — --series-N custom properties are declared once in
+	   src/routes/stats/+page.svelte; this component only references var(--series-N)
+	   via slotVar(). */
 
 	.year-nav {
 		display: flex;

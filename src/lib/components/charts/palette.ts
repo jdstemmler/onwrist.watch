@@ -35,39 +35,17 @@ export function assignSlots(watchIds: Iterable<number>): Map<number, number> {
 	return new Map(ids.map((id, i) => [id, i % CATEGORICAL.length]));
 }
 
-/** CSS custom-property name for a slot, e.g. `var(--series-3)`. Each chart
- * component declares the matching `--series-N` values (see PALETTE_STYLE)
- * in its own local <style> block per the dataviz skill's palette pattern. */
+/** CSS custom-property name for a slot, e.g. `var(--series-3)`. The matching
+ * `--series-N` values (light + dark, kept in sync with CATEGORICAL above) are
+ * declared exactly once, in a `:global(.chart-palette)` rule in
+ * `src/routes/stats/+page.svelte` — every chart component's root element
+ * carries class="chart-palette" and only ever references `var(--series-N)`,
+ * never redeclaring the values itself. (Svelte `<style>` blocks are static
+ * CSS text, so this constant can't be interpolated into them — the page's
+ * `<style>` block is the single source of truth instead.) */
 export function slotVar(slot: number): string {
 	return `var(--series-${(slot % CATEGORICAL.length) + 1})`;
 }
-
-/** The literal CSS text every chart's local <style> block repeats verbatim
- * (light values + dark override, matching both the OS-level media query and
- * the viewer's manual theme toggle) so `var(--series-N)` resolves identically
- * everywhere. Interpolate into a `:global(.chart-palette)` selector or similar
- * root class in each component. */
-export const PALETTE_CSS = `
-	--series-1: ${CATEGORICAL[0].light};
-	--series-2: ${CATEGORICAL[1].light};
-	--series-3: ${CATEGORICAL[2].light};
-	--series-4: ${CATEGORICAL[3].light};
-	--series-5: ${CATEGORICAL[4].light};
-	--series-6: ${CATEGORICAL[5].light};
-	--series-7: ${CATEGORICAL[6].light};
-	--series-8: ${CATEGORICAL[7].light};
-`;
-
-export const PALETTE_CSS_DARK = `
-	--series-1: ${CATEGORICAL[0].dark};
-	--series-2: ${CATEGORICAL[1].dark};
-	--series-3: ${CATEGORICAL[2].dark};
-	--series-4: ${CATEGORICAL[3].dark};
-	--series-5: ${CATEGORICAL[4].dark};
-	--series-6: ${CATEGORICAL[5].dark};
-	--series-7: ${CATEGORICAL[6].dark};
-	--series-8: ${CATEGORICAL[7].dark};
-`;
 
 /** Rounds `max` up to a "nice" axis ceiling (1/2/5 × 10^n) and returns evenly
  * spaced tick values from 0..niceMax inclusive (honest 0-based axes). */
