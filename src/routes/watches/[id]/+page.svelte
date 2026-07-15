@@ -70,7 +70,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.stats.label} — horolog</title>
+	<title>{data.stats.label} — {data.appName}</title>
 </svelte:head>
 
 <div class="detail">

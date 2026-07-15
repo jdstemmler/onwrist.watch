@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { createDb } from './index';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createDb, resolveDbFile } from './index';
 import { watches, wearSessions } from './schema';
 
 describe('db', () => {
@@ -30,5 +33,36 @@ describe('db', () => {
 			.run();
 		db.delete(watches).run();
 		expect(db.select().from(wearSessions).all()).toHaveLength(0);
+	});
+});
+
+describe('resolveDbFile', () => {
+	const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'horolog-db-'));
+
+	it('returns the app-name-agnostic watches.db path', () => {
+		const dir = tmp();
+		expect(resolveDbFile(dir)).toBe(path.join(dir, 'watches.db'));
+	});
+
+	it('migrates a legacy horolog.db (and WAL sidecars) to watches.db once', () => {
+		const dir = tmp();
+		fs.writeFileSync(path.join(dir, 'horolog.db'), 'main');
+		fs.writeFileSync(path.join(dir, 'horolog.db-wal'), 'wal');
+		fs.writeFileSync(path.join(dir, 'horolog.db-shm'), 'shm');
+		const file = resolveDbFile(dir);
+		expect(file).toBe(path.join(dir, 'watches.db'));
+		expect(fs.readFileSync(file, 'utf8')).toBe('main');
+		expect(fs.readFileSync(`${file}-wal`, 'utf8')).toBe('wal');
+		expect(fs.readFileSync(`${file}-shm`, 'utf8')).toBe('shm');
+		expect(fs.existsSync(path.join(dir, 'horolog.db'))).toBe(false);
+	});
+
+	it('never overwrites an existing watches.db with the legacy file', () => {
+		const dir = tmp();
+		fs.writeFileSync(path.join(dir, 'watches.db'), 'current');
+		fs.writeFileSync(path.join(dir, 'horolog.db'), 'stale-legacy');
+		const file = resolveDbFile(dir);
+		expect(fs.readFileSync(file, 'utf8')).toBe('current');
+		expect(fs.existsSync(path.join(dir, 'horolog.db'))).toBe(true); // left alone
 	});
 });

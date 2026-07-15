@@ -31,7 +31,7 @@
 </script>
 
 <svelte:head>
-	<title>Wear Log — horolog</title>
+	<title>Wear Log — {data.appName}</title>
 </svelte:head>
 
 <section class="banner card" class:stale={data.stale}>

@@ -5,5 +5,5 @@ import { config } from '$lib/server/config';
 // data, so page loads (e.g. /log, /stats) can format dates in homeTz
 // without each re-importing $lib/server/config themselves.
 export const load: LayoutServerLoad = async () => {
-	return { homeTz: config.homeTz };
+	return { homeTz: config.homeTz, appName: config.appName };
 };

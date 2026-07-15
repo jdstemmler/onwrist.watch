@@ -1,10 +1,10 @@
 import path from 'node:path';
-import { createDb } from '../src/lib/server/db';
+import { createDb, resolveDbFile } from '../src/lib/server/db';
 import { watches } from '../src/lib/server/db/schema';
 import { createSession, putOn } from '../src/lib/server/sessions';
 
 const DATA_DIR = process.env.DATA_DIR ?? './data';
-const db = createDb(path.join(DATA_DIR, 'horolog.db'));
+const db = createDb(resolveDbFile(DATA_DIR));
 
 if (db.select().from(watches).all().length > 0) {
 	console.error('Database is not empty — refusing to seed. Delete the db file to reseed.');

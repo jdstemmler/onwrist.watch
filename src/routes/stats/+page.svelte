@@ -21,7 +21,7 @@
 </script>
 
 <svelte:head>
-	<title>Stats — horolog</title>
+	<title>Stats — {data.appName}</title>
 </svelte:head>
 
 <h1>Stats</h1>

@@ -5,6 +5,7 @@ services:
       - "3000:3000"
     environment:
       AUTH_TOKEN: ${AUTH_TOKEN:?set AUTH_TOKEN in .env}
+      APP_NAME: ${APP_NAME:-horolog}
       HOME_TZ: ${HOME_TZ:-America/Los_Angeles}
       STALE_SESSION_HOURS: ${STALE_SESSION_HOURS:-24}
       # Must match the URL you load the dashboard from, or SvelteKit's CSRF

@@ -18,8 +18,26 @@ export function createDb(file: string) {
 
 export type DB = ReturnType<typeof createDb>;
 
+/**
+ * App-name-agnostic database path: ${dataDir}/watches.db. Deployments that
+ * predate the rename have ${dataDir}/horolog.db — migrate it (with WAL
+ * sidecars) exactly once. An existing watches.db always wins; a leftover
+ * legacy file is never allowed to clobber it.
+ */
+export function resolveDbFile(dataDir: string): string {
+	const file = path.join(dataDir, 'watches.db');
+	const legacy = path.join(dataDir, 'horolog.db');
+	if (!fs.existsSync(file) && fs.existsSync(legacy)) {
+		fs.renameSync(legacy, file);
+		for (const ext of ['-wal', '-shm']) {
+			if (fs.existsSync(legacy + ext)) fs.renameSync(legacy + ext, file + ext);
+		}
+	}
+	return file;
+}
+
 let _db: DB | undefined;
 export function getDb(): DB {
-	_db ??= createDb(path.join(config.dataDir, 'horolog.db'));
+	_db ??= createDb(resolveDbFile(config.dataDir));
 	return _db;
 }

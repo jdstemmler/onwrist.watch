@@ -1,8 +1,8 @@
 <script lang="ts">
 	import '../app.css';
 	import Nav from '$lib/components/Nav.svelte';
-	let { children } = $props();
+	let { children, data } = $props();
 </script>
 
-<Nav />
+<Nav appName={data.appName} />
 <main>{@render children()}</main>

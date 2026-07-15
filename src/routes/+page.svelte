@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>Collection — horolog</title>
+	<title>Collection — {data.appName}</title>
 </svelte:head>
 
 <header class="row">

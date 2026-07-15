@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	let { appName }: { appName: string } = $props();
 	const links = [
 		{ href: '/', label: 'Collection' },
 		{ href: '/log', label: 'Wear Log' },
@@ -8,7 +9,7 @@
 </script>
 
 <nav>
-	<span class="brand">horolog</span>
+	<span class="brand">{appName}</span>
 	<div class="links">
 		{#each links as l}
 			<a href={l.href} aria-current={page.url.pathname === l.href ? 'page' : undefined}>{l.label}</a>
