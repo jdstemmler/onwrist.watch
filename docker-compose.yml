@@ -1,0 +1,12 @@
+services:
+  horolog:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      AUTH_TOKEN: ${AUTH_TOKEN:?set AUTH_TOKEN in .env}
+      HOME_TZ: ${HOME_TZ:-America/Los_Angeles}
+      STALE_SESSION_HOURS: ${STALE_SESSION_HOURS:-24}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
