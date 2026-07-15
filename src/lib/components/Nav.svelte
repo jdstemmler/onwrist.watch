@@ -18,16 +18,38 @@
 
 <style>
 	nav {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 1.5rem;
 		padding: 0.9rem 1.25rem;
-		border-bottom: 1px solid var(--border);
 		background: var(--bg-raised);
 	}
 
+	/* NATO stripe: navy / olive / navy */
+	nav::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 3px;
+		background: linear-gradient(
+			90deg,
+			var(--navy) 0 25%,
+			var(--accent) 25% 75%,
+			var(--navy) 75% 100%
+		);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		nav::after {
+			opacity: 0.65; /* lume tokens run hot on the black dial — keep the stripe quiet */
+		}
+	}
+
 	.brand {
-		font-family: var(--font-serif);
+		font-family: var(--font-display);
 		font-size: 1.05rem;
 		font-weight: 600;
 		letter-spacing: 0.14em;
@@ -65,7 +87,7 @@
 		right: 0;
 		bottom: -1px;
 		height: 2px;
-		background: var(--accent);
+		background: var(--navy);
 		border-radius: 1px;
 	}
 

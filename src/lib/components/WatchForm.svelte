@@ -205,7 +205,7 @@
 	legend {
 		float: left;
 		width: 100%;
-		font-family: var(--font-serif);
+		font-family: var(--font-display);
 		font-weight: 600;
 		font-size: 0.9rem;
 		letter-spacing: 0.08em;

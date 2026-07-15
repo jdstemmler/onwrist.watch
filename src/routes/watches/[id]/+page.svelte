@@ -324,7 +324,7 @@
 	}
 
 	.primary-photo.placeholder span {
-		font-family: var(--font-serif);
+		font-family: var(--font-display);
 		font-size: 3rem;
 		letter-spacing: 0.05em;
 		color: var(--fg-muted);
@@ -368,7 +368,7 @@
 	}
 
 	.stat-value {
-		font-family: var(--font-serif);
+		font-family: var(--font-display);
 		font-size: 1.7rem;
 		color: var(--accent);
 		line-height: 1.1;

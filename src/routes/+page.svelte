@@ -149,7 +149,7 @@
 
 	details.sold summary {
 		cursor: pointer;
-		font-family: var(--font-serif);
+		font-family: var(--font-display);
 		font-weight: 600;
 		color: var(--fg-muted);
 	}

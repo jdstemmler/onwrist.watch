@@ -99,7 +99,7 @@
 		gap: 0.5rem 0.75rem;
 	}
 	.summary strong {
-		font-family: var(--font-serif);
+		font-family: var(--font-display);
 	}
 	.duration {
 		font-size: 0.85rem;
