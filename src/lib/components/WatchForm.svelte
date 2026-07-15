@@ -33,22 +33,22 @@
 	<fieldset>
 		<legend>Watch</legend>
 		<div class="fields">
-			<label>Brand <span class="req">*</span>
+			<label class="field"><span class="lbl">Brand <span class="req">*</span></span>
 				<input name="brand" required value={watch?.brand ?? ''} />
 			</label>
-			<label>Model <span class="req">*</span>
+			<label class="field"><span class="lbl">Model <span class="req">*</span></span>
 				<input name="model" required value={watch?.model ?? ''} />
 			</label>
-			<label>Nickname
+			<label class="field"><span class="lbl">Nickname</span>
 				<input name="nickname" value={watch?.nickname ?? ''} placeholder="e.g. Speedy" />
 			</label>
-			<label>Reference no.
+			<label class="field"><span class="lbl">Reference no.</span>
 				<input name="referenceNo" value={watch?.referenceNo ?? ''} />
 			</label>
-			<label>Dial color
+			<label class="field"><span class="lbl">Dial color</span>
 				<input name="dialColor" value={watch?.dialColor ?? ''} />
 			</label>
-			<label>Movement
+			<label class="field"><span class="lbl">Movement</span>
 				<select name="movement">
 					<option value="" selected={watch?.movement == null}>—</option>
 					{#each ['automatic', 'manual', 'quartz', 'solar', 'other'] as m}
@@ -56,16 +56,16 @@
 					{/each}
 				</select>
 			</label>
-			<label>Case (mm)
+			<label class="field"><span class="lbl">Case (mm)</span>
 				<input name="caseMm" type="number" step="0.1" min="0" value={watch?.caseMm ?? ''} />
 			</label>
-			<label>Lug width (mm)
+			<label class="field"><span class="lbl">Lug width (mm)</span>
 				<input name="lugMm" type="number" step="0.1" min="0" value={watch?.lugMm ?? ''} />
 			</label>
-			<label>Water resistance (m)
+			<label class="field"><span class="lbl">Water resistance (m)</span>
 				<input name="waterResistanceM" type="number" step="1" min="0" value={watch?.waterResistanceM ?? ''} />
 			</label>
-			<label class="wide">Strap notes
+			<label class="field wide"><span class="lbl">Strap notes</span>
 				<input name="strapNotes" value={watch?.strapNotes ?? ''} />
 			</label>
 		</div>
@@ -74,16 +74,16 @@
 	<fieldset>
 		<legend>Purchase</legend>
 		<div class="fields">
-			<label>Purchase date
+			<label class="field"><span class="lbl">Purchase date</span>
 				<input name="purchaseDate" type="date" value={watch?.purchaseDate ?? ''} />
 			</label>
-			<label>Price paid ($)
+			<label class="field"><span class="lbl">Price paid ($)</span>
 				<input name="pricePaid" type="number" step="0.01" min="0" value={centsToDollars(watch?.pricePaidCents)} />
 			</label>
-			<label>Purchased from
+			<label class="field"><span class="lbl">Purchased from</span>
 				<input name="purchasedFrom" value={watch?.purchasedFrom ?? ''} />
 			</label>
-			<label>Box &amp; papers
+			<label class="field"><span class="lbl">Box &amp; papers</span>
 				<select name="boxPapers">
 					<option value="" selected={watch?.boxPapers == null}>—</option>
 					{#each ['none', 'box', 'papers', 'both'] as b}
@@ -91,7 +91,7 @@
 					{/each}
 				</select>
 			</label>
-			<label>Condition
+			<label class="field"><span class="lbl">Condition</span>
 				<input name="condition" value={watch?.condition ?? ''} placeholder="e.g. excellent" />
 			</label>
 		</div>
@@ -100,19 +100,19 @@
 	<fieldset>
 		<legend>Status</legend>
 		<div class="fields">
-			<label>Status
+			<label class="field"><span class="lbl">Status</span>
 				<select name="status">
 					<option value="owned" selected={(watch?.status ?? 'owned') === 'owned'}>owned</option>
 					<option value="sold" selected={watch?.status === 'sold'}>sold</option>
 				</select>
 			</label>
-			<label>Sold date
+			<label class="field"><span class="lbl">Sold date</span>
 				<input name="soldDate" type="date" value={watch?.soldDate ?? ''} />
 			</label>
-			<label>Sold price ($)
+			<label class="field"><span class="lbl">Sold price ($)</span>
 				<input name="soldPrice" type="number" step="0.01" min="0" value={centsToDollars(watch?.soldPriceCents)} />
 			</label>
-			<label class="wide">Notes
+			<label class="field wide"><span class="lbl">Notes</span>
 				<textarea name="notes" rows="3">{watch?.notes ?? ''}</textarea>
 			</label>
 		</div>
@@ -139,7 +139,7 @@
 				{/each}
 			</ul>
 		{/if}
-		<label class="wide">{editing ? 'Add photo' : 'Photo'}
+		<label class="field wide"><span class="lbl">{editing ? 'Add photo' : 'Photo'}</span>
 			<input name="photo" type="file" accept="image/*" />
 		</label>
 	</fieldset>
@@ -196,51 +196,52 @@
 		border-radius: var(--radius);
 		background: var(--bg-raised);
 		box-shadow: var(--shadow);
-		padding: 1rem 1.1rem 1.2rem;
+		padding: 1.1rem 1.1rem 1.2rem;
 		margin: 0;
 	}
 
+	/* float pulls the legend out of the fieldset border, killing the
+	   default notched look; it renders as a section header inside the card */
 	legend {
+		float: left;
+		width: 100%;
 		font-family: var(--font-serif);
 		font-weight: 600;
-		font-size: 0.95rem;
-		letter-spacing: 0.06em;
+		font-size: 0.9rem;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--fg-muted);
-		padding: 0 0.4rem;
+		padding: 0 0 0.5rem;
+		margin: 0 0 1rem;
+		border-bottom: 1px solid var(--border);
+	}
+
+	fieldset::after {
+		content: '';
+		display: block;
+		clear: both;
+	}
+
+	/* direct children of the Photos fieldset sit outside a .fields grid;
+	   they must clear the floated legend too */
+	fieldset > label,
+	.photos {
+		clear: both;
 	}
 
 	.fields {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-		gap: 0.9rem 1.1rem;
-	}
-
-	label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		font-size: 0.82rem;
-		color: var(--fg-muted);
+		gap: 1rem 1.25rem;
+		clear: both;
 	}
 
 	label.wide {
 		grid-column: 1 / -1;
 	}
 
-	input,
-	select,
-	textarea {
-		color: var(--fg);
-		width: 100%;
-	}
-
 	textarea {
 		resize: vertical;
-	}
-
-	.req {
-		color: var(--accent);
 	}
 
 	.photos {
@@ -292,5 +293,19 @@
 		display: flex;
 		justify-content: space-between;
 		gap: 1rem;
+	}
+
+	.actions button {
+		min-width: 10rem;
+	}
+
+	@media (max-width: 30rem) {
+		.actions {
+			flex-direction: column;
+		}
+
+		.actions button {
+			width: 100%;
+		}
 	}
 </style>

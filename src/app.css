@@ -135,6 +135,39 @@ textarea {
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	padding: 0.5rem 0.65rem;
+	min-height: 2.5rem; /* inputs and selects align to one control height */
+}
+
+textarea {
+	min-height: 4rem;
+}
+
+input[type='file'] {
+	padding: 0.45rem 0.65rem;
+}
+
+/* Shared field vocabulary: <label class="field"><span class="lbl">…</span><input/></label>
+   Keeps caption + required mark on one line and label rhythm identical across pages. */
+label.field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	font-size: 0.85rem;
+	color: var(--fg-muted);
+}
+
+label.field > .lbl {
+	display: block;
+	line-height: 1.3;
+}
+
+label.field :is(input, select, textarea) {
+	color: var(--fg);
+	width: 100%;
+}
+
+.req {
+	color: var(--accent);
 }
 
 input:focus-visible,

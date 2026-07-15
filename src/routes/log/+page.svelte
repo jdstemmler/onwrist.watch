@@ -42,16 +42,16 @@
 	{#if data.state.valid_actions.includes('put_on')}
 		<form method="POST" action="?/putOn" use:enhance class="card action-form">
 			<h2>Put on</h2>
-			<label>
-				Watch
+			<label class="field">
+				<span class="lbl">Watch</span>
 				<select name="watch_id" required>
 					{#each data.state.watches as w (w.id)}
 						<option value={w.id}>{w.label}</option>
 					{/each}
 				</select>
 			</label>
-			<label>
-				Note
+			<label class="field">
+				<span class="lbl">Note</span>
 				<input type="text" name="note" placeholder="optional" />
 			</label>
 			<button type="submit" class="primary big">Put On</button>
@@ -61,16 +61,16 @@
 	{#if data.state.valid_actions.includes('swap')}
 		<form method="POST" action="?/swap" use:enhance class="card action-form">
 			<h2>Swap</h2>
-			<label>
-				New watch
+			<label class="field">
+				<span class="lbl">New watch</span>
 				<select name="watch_id" required>
 					{#each data.state.watches as w (w.id)}
 						<option value={w.id}>{w.label}</option>
 					{/each}
 				</select>
 			</label>
-			<label>
-				Note
+			<label class="field">
+				<span class="lbl">Note</span>
 				<input type="text" name="note" placeholder="optional" />
 			</label>
 			<button type="submit" class="primary big">Swap</button>
@@ -80,11 +80,11 @@
 	{#if data.state.valid_actions.includes('take_off')}
 		<form method="POST" action="?/takeOff" use:enhance class="card action-form">
 			<h2>Take off</h2>
-			<label>
-				Note
+			<label class="field">
+				<span class="lbl">Note</span>
 				<input type="text" name="note" placeholder="optional" />
 			</label>
-			<button type="submit" class="big">Take Off</button>
+			<button type="submit" class="primary big">Take Off</button>
 		</form>
 	{/if}
 </section>
@@ -92,24 +92,24 @@
 <details class="card backfill">
 	<summary>Backfill a session…</summary>
 	<form method="POST" action="?/backfill" use:enhance>
-		<label>
-			Watch
+		<label class="field">
+			<span class="lbl">Watch</span>
 			<select name="watch_id" required>
 				{#each data.allWatches as w (w.id)}
 					<option value={w.id}>{w.label}</option>
 				{/each}
 			</select>
 		</label>
-		<label>
-			Start
+		<label class="field">
+			<span class="lbl">Start</span>
 			<input type="datetime-local" name="started_at" required />
 		</label>
-		<label>
-			End <span class="muted">(optional — leave blank if still wearing)</span>
+		<label class="field">
+			<span class="lbl">End <span class="muted">(optional — leave blank if still wearing)</span></span>
 			<input type="datetime-local" name="ended_at" />
 		</label>
-		<label>
-			Note
+		<label class="field">
+			<span class="lbl">Note</span>
 			<textarea name="note" rows="2" placeholder="optional"></textarea>
 		</label>
 		<button type="submit" class="primary big">Add Session</button>
@@ -153,10 +153,17 @@
 		font-weight: 600;
 	}
 	.actions {
-		display: flex;
-		flex-direction: column;
+		display: grid;
+		grid-template-columns: 1fr;
 		gap: 0.75rem;
 		margin-bottom: 1rem;
+	}
+
+	@media (min-width: 44rem) {
+		.actions {
+			grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+			align-items: start;
+		}
 	}
 	.action-form {
 		display: flex;
@@ -165,18 +172,6 @@
 	}
 	.action-form h2 {
 		margin: 0;
-	}
-	label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		font-size: 0.9rem;
-		color: var(--fg-muted);
-	}
-	select,
-	input,
-	textarea {
-		width: 100%;
 	}
 	button.big {
 		width: 100%;
@@ -195,8 +190,9 @@
 	.backfill form {
 		display: flex;
 		flex-direction: column;
-		gap: 0.6rem;
-		margin-top: 0.75rem;
+		gap: 0.75rem;
+		margin-top: 0.9rem;
+		max-width: 34rem;
 	}
 	.timeline {
 		list-style: none;

@@ -54,24 +54,24 @@
 			     across the DST fall-back hour). -->
 			<input type="hidden" name="started_at_orig" value={s.startedLocal} />
 			<input type="hidden" name="ended_at_orig" value={s.endedLocal} />
-			<label>
-				Watch
+			<label class="field">
+				<span class="lbl">Watch</span>
 				<select name="watch_id" required>
 					{#each watches as w (w.id)}
 						<option value={w.id} selected={w.id === s.watchId}>{w.label}</option>
 					{/each}
 				</select>
 			</label>
-			<label>
-				Start
+			<label class="field">
+				<span class="lbl">Start</span>
 				<input type="datetime-local" name="started_at" value={s.startedLocal} required />
 			</label>
-			<label>
-				End <span class="muted">(blank = still wearing)</span>
+			<label class="field">
+				<span class="lbl">End <span class="muted">(blank = still wearing)</span></span>
 				<input type="datetime-local" name="ended_at" value={s.endedLocal} />
 			</label>
-			<label>
-				Note
+			<label class="field">
+				<span class="lbl">Note</span>
 				<textarea name="note" rows="2">{s.note ?? ''}</textarea>
 			</label>
 			<button type="submit" class="primary">Save</button>
@@ -116,22 +116,26 @@
 		font-weight: 600;
 		font-size: 0.9rem;
 	}
+	details[open] {
+		border-top: 1px solid var(--border);
+		padding-top: 0.75rem;
+	}
 	.edit-form {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
-		margin: 0.75rem 0;
+		gap: 0.75rem;
+		margin: 0.75rem 0 0.5rem;
+		max-width: 30rem;
 	}
-	.edit-form label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
+	.edit-form button {
+		align-self: flex-start;
+		min-width: 8rem;
+	}
+	details > form:last-child {
+		margin-top: 0.5rem;
+	}
+	details > form:last-child button {
 		font-size: 0.85rem;
-		color: var(--fg-muted);
-	}
-	.edit-form select,
-	.edit-form input,
-	.edit-form textarea {
-		width: 100%;
+		padding: 0.35rem 0.7rem;
 	}
 </style>
