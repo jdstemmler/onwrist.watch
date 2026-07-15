@@ -48,8 +48,11 @@ action's Headers section, key `Authorization`, value `Bearer {Token}`
    - Headers: `Authorization: Bearer {Token}`
 2. **"Get Dictionary from Input"** — feeds off the previous action's
    output, giving you a dictionary with keys `status_line`, `wearing`,
-   `valid_actions`, and `watches` (see `src/lib/server/state.ts` for the
-   exact shape — this is the `StateResponse` type).
+   `valid_actions`, `watches`, and `watch_menu` (see
+   `src/lib/server/state.ts` for the exact shape — this is the
+   `StateResponse` type). `watch_menu` is the one built for Shortcuts:
+   a dictionary of watch label → watch id, all owned watches,
+   most-recently-worn first.
 
 Save this dictionary to a variable (e.g. via "Set Variable" → `State`) so
 later steps can pull fields out of it with "Get Dictionary Value."
@@ -101,26 +104,29 @@ snappier "you can't do that" message, not a correctness requirement.
 Both branches follow the same shape; only the endpoint path and the
 notification wording differ.
 
-1. **"Get Dictionary Value"** — Get Value for `watches` from `State`.
-   This is the list of `{id, label}` objects for owned watches not
-   currently on the wrist.
-2. **"Choose from List"** — the list from step 1. Set "Show more items"
-   / list item text to display each entry's `label` field (Shortcuts
-   will offer to iterate/use `label` as the displayed text when the
-   input is a list of dictionaries — pick `label`).
-3. **"Get Dictionary Value"** — Get Value for `id` from the chosen list
-   item (the output of "Choose from List").
-4. **"Get Contents of URL"**
+1. **"Get Dictionary Value"** — Get Value for `watch_menu` from `State`.
+   This is a dictionary whose keys are the watch labels and whose values
+   are the watch ids.
+2. **"Choose from List"** — pass the `watch_menu` dictionary in directly.
+   Shortcuts renders each **key** (the watch's label) as a tappable row —
+   no per-item configuration needed. The output ("Chosen Item") is that
+   entry's **value**, i.e. the watch id itself.
+3. **"Get Contents of URL"**
    - URL: `{BaseURL}/api/actions/put-on` (Put on branch) or
      `{BaseURL}/api/actions/swap` (Swap branch)
    - Method: `POST`
    - Headers: `Authorization: Bearer {Token}`
-   - Request Body: JSON, `{"watch_id": <id from step 3>}`
-     (build this with "Add new field" in the body editor, key
-     `watch_id`, type Number, value = the dictionary value from step 3)
-5. **"Get Dictionary Value"** — Get Value for `message` from the
+   - Request Body: JSON, one field — key `watch_id`, type **Number**,
+     value = the **Chosen Item** magic variable from step 2 (it is
+     already the id; nothing to extract).
+4. **"Get Dictionary Value"** — Get Value for `message` from the
    response.
-6. **"Show Notification"** — body = the `message` value from step 5.
+5. **"Show Notification"** — body = the `message` value from step 4.
+
+Note: `watch_menu` includes the currently-worn watch too (so Backfill
+can target it). If you tap it here, the API just answers with a 409 and
+a human-readable `message` ("Already wearing that watch") — which your
+notification shows. Nothing breaks.
 
 `put-on` response: `{"message": "...", "session": {...}}`.
 `swap` response: `{"message": "...", "closed": {...}, "opened": {...}}`.
@@ -147,15 +153,11 @@ Backfill logs a session after the fact (e.g. you forgot to log this
 morning's watch). This branch always runs — it isn't gated by
 `valid_actions`.
 
-1. **"Get Dictionary Value"** — Get Value for `watches` from `State`.
-   Note: for backfill you may want the *full* watch list (including the
-   one currently worn, if any) rather than the filtered list `/api/state`
-   returns — if so, either accept the current-wear watch being absent
-   from the list, or extend the shortcut later to fetch a full watch
-   list. For v1, the `watches` array from `/api/state` is what's used.
-2. **"Choose from List"** — same pattern as section 4: display by
-   `label`, then **"Get Dictionary Value"** for `id` to get the chosen
-   watch's id.
+1. **"Get Dictionary Value"** — Get Value for `watch_menu` from `State`.
+   It includes **all** owned watches — the currently-worn one too — so
+   you can backfill yesterday's wear of the watch on your wrist right now.
+2. **"Choose from List"** — pass the dictionary in directly, exactly as
+   in section 4: rows show the labels, and "Chosen Item" is the watch id.
 3. **"Ask for Input"** — Input Type: Date and Time. Prompt: "When did you
    put it on?" This is the session start.
 4. **"Choose from Menu"** — three items for the end time:
