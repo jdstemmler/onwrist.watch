@@ -28,11 +28,28 @@ describe('apiTry', () => {
 		expect(res.status).toBe(409);
 		expect((await res.json()).message).toBe('Already wearing a watch');
 	});
-	it('maps ZodError to 400', async () => {
+	it('maps ZodError to 400 with a field-naming message', async () => {
 		const res = await apiTry(async () => {
 			z.object({ watch_id: z.number() }).parse({});
 			return json({});
 		});
 		expect(res.status).toBe(400);
+		const body = await res.json();
+		// message is shown verbatim in shortcut notifications — must name the field
+		expect(body.message).toContain('watch_id');
+		expect(body.issues).toBeDefined();
+	});
+
+	it('400 message names every offending field', async () => {
+		const res = await apiTry(async () => {
+			z.object({
+				watch_id: z.number(),
+				started_at: z.string().datetime({ offset: true })
+			}).parse({ watch_id: '5', started_at: '2026-07-14T09:00:00' });
+			return json({});
+		});
+		const body = await res.json();
+		expect(body.message).toContain('watch_id');
+		expect(body.message).toContain('started_at');
 	});
 });
