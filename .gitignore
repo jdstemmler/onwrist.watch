@@ -27,3 +27,4 @@ data/
 
 # .superpowers (task execution context)
 .superpowers/
+.claude/
