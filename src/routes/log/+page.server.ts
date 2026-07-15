@@ -8,18 +8,7 @@ import { getState } from '$lib/server/state';
 import {
 	StateError, createSession, deleteSession, putOn, swap, takeOff, updateSession, watchLabel
 } from '$lib/server/sessions';
-import { zonedParts } from '$lib/server/time';
-
-// Formats a Date as the "YYYY-MM-DDTHH:MM" value a <input type="datetime-local">
-// expects, expressed in the given IANA tz — inverse of localInputToUtc below.
-// Used only to prefill edit-form inputs server-side (avoids duplicating tz
-// math in the browser); the round-trip through localInputToUtc is exact
-// because zonedParts is the same function driving both directions.
-function toLocalInput(date: Date, tz: string): string {
-	const p = zonedParts(date, tz);
-	const pad = (n: number) => String(n).padStart(2, '0');
-	return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
-}
+import { localInputToUtc, toLocalInput } from '$lib/server/time';
 
 export const load: PageServerLoad = async () => {
 	const db = getDb();
@@ -44,22 +33,6 @@ export const load: PageServerLoad = async () => {
 		? [...state.watches, { id: state.wearing.id, label: state.wearing.label }]
 		: state.watches };
 };
-
-// datetime-local gives "2026-07-14T07:42" in HOME_TZ — convert to UTC Date.
-// Trick: format a probe date's tz offset via Intl, or require the server run with TZ=HOME_TZ.
-// Simplest robust approach: new Date(`${value}:00${offsetForTz(value, config.homeTz)}`).
-function localInputToUtc(value: string): Date {
-	// value: YYYY-MM-DDTHH:MM interpreted in config.homeTz.
-	// Find the UTC instant whose zonedParts match the requested wall time (two-pass fixpoint
-	// handles DST): guess = value as UTC, then correct by the observed offset.
-	let guess = new Date(`${value}:00Z`);
-	for (let i = 0; i < 2; i++) {
-		const p = zonedParts(guess, config.homeTz);
-		const wall = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
-		guess = new Date(guess.getTime() + (new Date(`${value}:00Z`).getTime() - wall));
-	}
-	return guess;
-}
 
 const err = (e: unknown) =>
 	e instanceof StateError ? fail(409, { message: e.message }) : (() => { throw e; })();
@@ -96,8 +69,10 @@ export const actions: Actions = {
 		try {
 			createSession(getDb(), {
 				watchId: Number(f.get('watch_id')),
-				startedAt: localInputToUtc(f.get('started_at') as string),
-				endedAt: f.get('ended_at') ? localInputToUtc(f.get('ended_at') as string) : null,
+				startedAt: localInputToUtc(f.get('started_at') as string, config.homeTz),
+				endedAt: f.get('ended_at')
+					? localInputToUtc(f.get('ended_at') as string, config.homeTz)
+					: null,
 				note: (f.get('note') as string) || undefined,
 				source: 'backfill'
 			});
@@ -106,10 +81,31 @@ export const actions: Actions = {
 	update: async ({ request }) => {
 		const f = await request.formData();
 		try {
+			// Only re-derive a timestamp the user actually edited. datetime-local
+			// strings are lossy during the DST fall-back hour (two distinct instants
+			// format identically — see localInputToUtc in $lib/server/time), so
+			// re-parsing an unchanged prefill can silently shift a session that
+			// started/ended in that repeated wall-clock hour. Comparing against the
+			// hidden *_orig values (the exact strings the form was prefilled with)
+			// lets an unchanged field fall through to updateSession's own
+			// keep-existing-value behavior instead of round-tripping through the
+			// lossy string representation.
+			const startedAtRaw = f.get('started_at') as string;
+			const startedAtOrig = f.get('started_at_orig') as string;
+			const endedAtRaw = (f.get('ended_at') as string) ?? '';
+			const endedAtOrig = (f.get('ended_at_orig') as string) ?? '';
 			updateSession(getDb(), Number(f.get('id')), {
 				watchId: Number(f.get('watch_id')),
-				startedAt: localInputToUtc(f.get('started_at') as string),
-				endedAt: f.get('ended_at') ? localInputToUtc(f.get('ended_at') as string) : null,
+				startedAt:
+					startedAtRaw === startedAtOrig
+						? undefined
+						: localInputToUtc(startedAtRaw, config.homeTz),
+				endedAt:
+					endedAtRaw === endedAtOrig
+						? undefined
+						: endedAtRaw
+							? localInputToUtc(endedAtRaw, config.homeTz)
+							: null,
 				note: (f.get('note') as string) || null
 			});
 		} catch (e) { return err(e); }

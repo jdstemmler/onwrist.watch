@@ -49,6 +49,11 @@
 		<summary>Edit</summary>
 		<form method="POST" action="?/update" use:enhance class="edit-form">
 			<input type="hidden" name="id" value={s.id} />
+			<!-- Original prefill strings, compared server-side so an unedited field
+			     falls through to the stored Date instead of being re-parsed (lossy
+			     across the DST fall-back hour). -->
+			<input type="hidden" name="started_at_orig" value={s.startedLocal} />
+			<input type="hidden" name="ended_at_orig" value={s.endedLocal} />
 			<label>
 				Watch
 				<select name="watch_id" required>
