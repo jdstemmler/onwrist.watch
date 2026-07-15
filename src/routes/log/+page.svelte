@@ -18,6 +18,16 @@
 		const m = totalMin % 60;
 		return h > 0 ? `${h}h ${m}m` : `${m}m`;
 	}
+
+	const fmtTime = (d: string | Date) =>
+		new Intl.DateTimeFormat('en-US', {
+			hour: 'numeric',
+			minute: '2-digit',
+			timeZone: data.homeTz
+		}).format(new Date(d));
+
+	// most recent closed session (sessions arrive newest-first)
+	const lastOff = $derived(data.sessions.find((s) => s.endedAt !== null));
 </script>
 
 <svelte:head>
@@ -25,9 +35,21 @@
 </svelte:head>
 
 <section class="banner card" class:stale={data.stale}>
-	<h1>{data.state.status_line}</h1>
 	{#if data.state.wearing}
-		<p class="elapsed num">Worn {elapsed(data.state.wearing.since)}</p>
+		<p class="kicker"><span class="dot on"></span>On wrist</p>
+		<h1 class="watch-name">{data.state.wearing.label}</h1>
+		<p class="sub num">
+			since {fmtTime(data.state.wearing.since)} · {elapsed(data.state.wearing.since)}
+		</p>
+	{:else}
+		<p class="kicker"><span class="dot"></span>No watch on</p>
+		{#if lastOff}
+			<h1 class="watch-name">{lastOff.label}</h1>
+			<p class="sub num">taken off at {fmtTime(lastOff.endedAt!)}</p>
+		{:else}
+			<h1 class="watch-name">Nothing logged yet</h1>
+			<p class="sub">put a watch on below to start the record</p>
+		{/if}
 	{/if}
 	{#if data.stale}
 		<p class="nudge">⚠️ Still wearing this? Fix below.</p>
@@ -127,17 +149,44 @@
 	.banner {
 		text-align: center;
 		margin-bottom: 1rem;
-	}
-	.banner h1 {
-		margin-bottom: 0.25rem;
+		padding-block: 1.25rem;
 	}
 	.banner.stale {
 		border-color: var(--danger);
 	}
-	.elapsed {
-		font-size: 1.1rem;
+	.kicker {
+		font-family: var(--font-display);
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
 		color: var(--fg-muted);
+		margin: 0 0 0.4rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.45rem;
+	}
+	.dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		border: 1.5px solid var(--fg-muted);
+	}
+	.dot.on {
+		border: none;
+		background: var(--accent);
+		box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 65%, transparent);
+	}
+	.watch-name {
+		font-size: 1.5rem;
 		margin: 0;
+		line-height: 1.25;
+	}
+	.sub {
+		font-size: 0.9rem;
+		color: var(--fg-muted);
+		margin: 0.3rem 0 0;
 	}
 	.nudge {
 		margin: 0.5rem 0 0;
