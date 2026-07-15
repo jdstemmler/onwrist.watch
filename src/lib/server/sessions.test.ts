@@ -49,6 +49,13 @@ describe('takeOff', () => {
 	it('rejects when nothing is on', () => {
 		expect(() => takeOff(db)).toThrow(StateError);
 	});
+
+	it('rejects taking off at or before the open session start', () => {
+		const at = T('2026-07-14T14:42:00Z');
+		putOn(db, { watchId: speedy, at });
+		expect(() => takeOff(db, { at })).toThrow(StateError);
+		expect(() => takeOff(db, { at: T('2026-07-14T14:00:00Z') })).toThrow(StateError);
+	});
 });
 
 describe('swap', () => {
@@ -69,6 +76,13 @@ describe('swap', () => {
 	it('rejects swapping to the same watch', () => {
 		putOn(db, { watchId: speedy });
 		expect(() => swap(db, { watchId: speedy })).toThrow(StateError);
+	});
+
+	it('rejects swapping at or before the open session start', () => {
+		const at = T('2026-07-14T14:42:00Z');
+		putOn(db, { watchId: speedy, at });
+		expect(() => swap(db, { watchId: datejust, at })).toThrow(StateError);
+		expect(() => swap(db, { watchId: datejust, at: T('2026-07-14T14:00:00Z') })).toThrow(StateError);
 	});
 });
 
@@ -150,5 +164,13 @@ describe('updateSession / deleteSession', () => {
 		const a = putOn(db, { watchId: speedy });
 		deleteSession(db, a.id);
 		expect(getOpenSession(db)).toBeNull();
+	});
+
+	it('rejects re-opening a closed session while another is open', () => {
+		const closed = createSession(db, {
+			watchId: speedy, startedAt: T('2026-07-14T14:00:00Z'), endedAt: T('2026-07-14T18:00:00Z')
+		});
+		putOn(db, { watchId: datejust, at: T('2026-07-14T19:00:00Z') });
+		expect(() => updateSession(db, closed.id, { endedAt: null })).toThrow(StateError);
 	});
 });
