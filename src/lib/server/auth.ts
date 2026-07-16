@@ -21,38 +21,41 @@ export function verifyPassword(supplied: string, configured: string): boolean {
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 
 /** Creates a session row and returns the (unhashed) cookie token. */
-export function createSession(db: DB, days: number, now = new Date()): string {
+export async function createSession(db: DB, days: number, now = new Date()): Promise<string> {
 	const token = crypto.randomBytes(32).toString('base64url');
-	db.insert(authSessions)
-		.values({ tokenHash: hashToken(token), expiresAt: new Date(now.getTime() + days * DAY) })
-		.run();
+	await db
+		.insert(authSessions)
+		.values({ tokenHash: hashToken(token), expiresAt: new Date(now.getTime() + days * DAY) });
 	return token;
 }
 
 /** True for a live session; renews the expiry once past its half-life. */
-export function validateSession(db: DB, token: string, days: number, now = new Date()): boolean {
+export async function validateSession(
+	db: DB,
+	token: string,
+	days: number,
+	now = new Date()
+): Promise<boolean> {
 	if (!token) return false;
-	const row = db
-		.select()
-		.from(authSessions)
-		.where(eq(authSessions.tokenHash, hashToken(token)))
-		.get();
+	const row = (
+		await db.select().from(authSessions).where(eq(authSessions.tokenHash, hashToken(token))).limit(1)
+	)[0] ?? null;
 	if (!row || row.expiresAt.getTime() <= now.getTime()) return false;
 	if (row.expiresAt.getTime() - now.getTime() < (days * DAY) / 2) {
-		db.update(authSessions)
+		await db
+			.update(authSessions)
 			.set({ expiresAt: new Date(now.getTime() + days * DAY) })
-			.where(eq(authSessions.id, row.id))
-			.run();
+			.where(eq(authSessions.id, row.id));
 	}
 	return true;
 }
 
-export function revokeSession(db: DB, token: string): void {
-	db.delete(authSessions).where(eq(authSessions.tokenHash, hashToken(token))).run();
+export async function revokeSession(db: DB, token: string): Promise<void> {
+	await db.delete(authSessions).where(eq(authSessions.tokenHash, hashToken(token)));
 }
 
-export function pruneSessions(db: DB, now = new Date()): void {
-	db.delete(authSessions).where(lt(authSessions.expiresAt, now)).run();
+export async function pruneSessions(db: DB, now = new Date()): Promise<void> {
+	await db.delete(authSessions).where(lt(authSessions.expiresAt, now));
 }
 
 /* In-memory login throttle: global (single-user app, single process).
