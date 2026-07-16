@@ -198,6 +198,13 @@
 		</div>
 	</section>
 
+	{#if data.watch.notes}
+		<section class="card notes">
+			<h2>Notes</h2>
+			<p>{data.watch.notes}</p>
+		</section>
+	{/if}
+
 	<section class="card dow">
 		<h2>By day of week</h2>
 		<div class="bars">
@@ -401,6 +408,16 @@
 		font-size: 0.85rem;
 		width: 40%;
 		padding-right: 0.75rem;
+	}
+
+	.notes {
+		margin-bottom: 1rem;
+	}
+
+	.notes p {
+		margin: 0;
+		white-space: pre-line; /* keep the owner's line breaks */
+		color: var(--fg);
 	}
 
 	.dow .bars {
