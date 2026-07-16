@@ -40,10 +40,21 @@ Remember to update `ORIGIN` in `.env` to the tunnel hostname when you switch.
 
 ## Development
 
+The app runs against Postgres. Local dev uses a disposable scratch stack —
+never the production `docker-compose.yml` project:
+
 ```sh
-npm run dev          # dev server (set DASH_PASSWORD=dev)
-npm test             # Vitest suite — must be green before any commit
+docker compose -f docker-compose.scratch.yml -p onwrist-scratch up -d
+env $(cat .env.scratch | xargs) npm run dev   # dev server on :5199
+```
+
+```sh
+npm test             # Vitest suite (PGlite) — must be green before any commit
 npm run check        # svelte-check / typecheck
 npm run db:generate  # generate a Drizzle migration after schema changes
-npm run seed         # seed dev DB with 12 watches + wear history (refuses non-empty DB)
+npm run seed         # seed the scratch DB with 12 watches + wear history (refuses non-empty DB)
 ```
+
+Tear the scratch stack down with
+`docker compose -f docker-compose.scratch.yml -p onwrist-scratch down`. See
+`docs/deploy.md` for the production topology, backups, and restore.
