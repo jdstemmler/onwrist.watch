@@ -1,4 +1,5 @@
-import { pgTable, text, integer, real, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, real, boolean, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 const timestamps = {
 	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
@@ -46,17 +47,21 @@ export const watchPhotos = pgTable('watch_photos', {
 	sortOrder: integer('sort_order').notNull().default(0)
 });
 
-export const wearSessions = pgTable('wear_sessions', {
-	id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-	watchId: integer('watch_id')
-		.notNull()
-		.references(() => watches.id, { onDelete: 'cascade' }),
-	startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }).notNull(),
-	endedAt: timestamp('ended_at', { withTimezone: true, mode: 'date' }), // NULL = on wrist
-	note: text('note'),
-	source: text('source', { enum: ['shortcut', 'web', 'backfill'] }).notNull(),
-	...timestamps
-});
+export const wearSessions = pgTable(
+	'wear_sessions',
+	{
+		id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+		watchId: integer('watch_id')
+			.notNull()
+			.references(() => watches.id, { onDelete: 'cascade' }),
+		startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }).notNull(),
+		endedAt: timestamp('ended_at', { withTimezone: true, mode: 'date' }), // NULL = on wrist
+		note: text('note'),
+		source: text('source', { enum: ['shortcut', 'web', 'backfill'] }).notNull(),
+		...timestamps
+	},
+	(t) => [uniqueIndex('one_open_session_per_watch').on(t.watchId).where(sql`${t.endedAt} IS NULL`)]
+);
 
 export const authSessions = pgTable('auth_sessions', {
 	id: integer('id').primaryKey().generatedAlwaysAsIdentity(),

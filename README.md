@@ -11,6 +11,10 @@ anywhere via cloudflared.
 
 ## Quickstart
 
+> **Note:** production still runs the pre-Plan-A image; this compose stack is
+> for the future cutover, not day-to-day dev — see "Status this branch" in
+> `docs/deploy.md` and the Development section below for the scratch stack.
+
 ```sh
 cp .env.example .env
 # edit .env: set DASH_PASSWORD (the login password) and ORIGIN to the

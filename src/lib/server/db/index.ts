@@ -17,7 +17,10 @@ export async function getDb(): Promise<DB> {
 		const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 		_db = createDb(pool);
 	}
-	_migrated ??= migrate(_db, { migrationsFolder: 'drizzle' });
+	_migrated ??= migrate(_db, { migrationsFolder: 'drizzle' }).catch((e) => {
+		_migrated = undefined;
+		throw e;
+	});
 	await _migrated;
 	return _db;
 }

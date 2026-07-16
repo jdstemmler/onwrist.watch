@@ -8,6 +8,13 @@
       "when": 1784240476375,
       "tag": "0000_windy_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784244097985,
+      "tag": "0001_charming_bloodscream",
+      "breakpoints": true
     }
   ]
 }

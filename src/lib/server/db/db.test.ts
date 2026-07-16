@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { createTestDb } from './test-utils';
 import { watches, wearSessions } from './schema';
 
@@ -26,5 +27,35 @@ describe('db', () => {
 		await db.insert(wearSessions).values({ watchId: w.id, startedAt: new Date(), source: 'web' });
 		await db.delete(watches);
 		expect(await db.select().from(wearSessions)).toHaveLength(0);
+	});
+
+	it('DB backstop: rejects a second open session for the same watch', async () => {
+		const db = await createTestDb();
+		const [w] = await db.insert(watches).values({ brand: 'C', model: 'D' }).returning();
+		await db.insert(wearSessions).values({ watchId: w.id, startedAt: new Date(), source: 'web' });
+
+		await expect(
+			db.insert(wearSessions).values({ watchId: w.id, startedAt: new Date(), source: 'web' })
+		).rejects.toThrow();
+	});
+
+	it('DB backstop: allows a new open session after the prior one is closed', async () => {
+		const db = await createTestDb();
+		const [w] = await db.insert(watches).values({ brand: 'E', model: 'F' }).returning();
+		const [first] = await db
+			.insert(wearSessions)
+			.values({ watchId: w.id, startedAt: new Date('2026-07-14T14:00:00Z'), source: 'web' })
+			.returning();
+
+		await db
+			.update(wearSessions)
+			.set({ endedAt: new Date('2026-07-14T15:00:00Z') })
+			.where(eq(wearSessions.id, first.id));
+
+		const [second] = await db
+			.insert(wearSessions)
+			.values({ watchId: w.id, startedAt: new Date('2026-07-14T15:00:00Z'), source: 'web' })
+			.returning();
+		expect(second.endedAt).toBeNull();
 	});
 });

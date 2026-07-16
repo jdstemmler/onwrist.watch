@@ -1,6 +1,6 @@
 # horolog
 
-Single-user, self-hosted watch-collection tracker: inventory + wear-session logging (installable PWA) + stats dashboard. Runs as one SvelteKit container on a homelab behind cloudflared.
+Single-user, self-hosted watch-collection tracker: inventory + wear-session logging (installable PWA) + stats dashboard. Runs as a SvelteKit app + Postgres via docker compose on a homelab behind cloudflared.
 
 - **Design spec:** `docs/superpowers/specs/2026-07-14-horolog-design.md` — the source of truth for scope and behavior.
 - **Implementation plan:** `docs/superpowers/plans/2026-07-14-horolog.md` — task-by-task with complete code; includes the unattended-run Execution Directive. If you're implementing, work from your assigned task's interface contract.
@@ -37,7 +37,7 @@ for the full production topology, backup, and restore procedures.
 - Domain functions live in `src/lib/server/` and are async, taking the DB handle as their first argument (tests use `await createTestDb()` from the PGlite harness in `src/lib/server/db/test-utils.ts`, not `createDb(':memory:')`).
 - Photo files are only ever touched via the `PhotoStorage` interface (`src/lib/server/storage/`, `put`/`get`/`delete`/`sizeOfPrefix`) — never read/write the photos directory directly outside that module.
 - State-machine violations throw `StateError` → 409 with a human-readable `message`, shown verbatim as a dashboard toast — write it for a phone-sized screen.
-- Timestamps stored UTC (Drizzle `timestamp_ms`); all DOW/TOD/calendar bucketing uses `config.homeTz` via `src/lib/server/time.ts`. Money is integer cents.
+- Timestamps stored UTC (Drizzle `timestamp(..., { withTimezone: true, mode: 'date' })`); all DOW/TOD/calendar bucketing uses `config.homeTz` via `src/lib/server/time.ts`. Money is integer cents.
 - Auth is a single-password session cookie (`DASH_PASSWORD` env; `src/lib/server/auth.ts`, gated in `hooks.server.ts`). There is no REST API — the retired shortcut-facing `/api/*` surface is recoverable from git history if ever needed. Dashboard mutations are SvelteKit form actions calling the domain functions — don't add parallel REST endpoints.
 - Watch display name: `watchLabel()` (nickname, else brand + model). Don't reimplement.
 - TDD for domain/stats/auth; UI is lightly tested and verified in the browser. Apply the frontend-design skill for UI work and the dataviz skill for charts.

@@ -106,8 +106,8 @@ safe to run live since photos are immutable once uploaded).
    gunzip -c /path/to/backups/onwrist-20260716.sql.gz | docker compose exec -T db psql -U onwrist onwrist
    ```
    If restoring into a fresh volume, drop and recreate the database first
-   (`dropdb`/`createdb -U onwrist onwrist` inside the `db` container) so the
-   restore starts clean.
+   (`docker compose exec -T db dropdb -U onwrist onwrist && docker compose exec -T db createdb -U onwrist onwrist`)
+   so the restore starts clean.
 3. Restore photos: `rsync -av /path/to/backups/photos/ /path/to/onwrist/data/photos/`.
 4. Start the app back up: `docker compose start horolog`. Migrations run
    automatically on boot and are a no-op if the restored schema is already

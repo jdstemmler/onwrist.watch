@@ -24,6 +24,7 @@ vite.config.ts.timestamp-*
 
 # Data
 data/
+.scratch-data/
 
 # .superpowers (task execution context)
 .superpowers/
