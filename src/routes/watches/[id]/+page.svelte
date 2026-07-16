@@ -135,6 +135,9 @@
 					{#if data.watch.referenceNo}
 						<tr><th>Reference</th><td>{data.watch.referenceNo}</td></tr>
 					{/if}
+					{#if data.watch.serialNo}
+						<tr><th>Serial</th><td class="num">{data.watch.serialNo}</td></tr>
+					{/if}
 					{#if data.watch.dialColor}
 						<tr><th>Dial</th><td>{data.watch.dialColor}</td></tr>
 					{/if}
@@ -161,11 +164,14 @@
 			<h2>Ownership</h2>
 			<table class="spec">
 				<tbody>
+					{#if data.watch.isGift}
+						<tr><th>Gift</th><td>yes</td></tr>
+					{/if}
 					{#if data.watch.purchaseDate}
-						<tr><th>Purchased</th><td class="num">{data.watch.purchaseDate}</td></tr>
+						<tr><th>{data.watch.isGift ? 'Received' : 'Purchased'}</th><td class="num">{data.watch.purchaseDate}</td></tr>
 					{/if}
 					{#if data.watch.pricePaidCents != null}
-						<tr><th>Price paid</th><td class="num">{money(data.watch.pricePaidCents)}</td></tr>
+						<tr><th>{data.watch.isGift ? 'Est. value' : 'Price paid'}</th><td class="num">{money(data.watch.pricePaidCents)}</td></tr>
 					{/if}
 					{#if data.watch.purchasedFrom}
 						<tr><th>From</th><td>{data.watch.purchasedFrom}</td></tr>
@@ -175,6 +181,9 @@
 					{/if}
 					{#if data.watch.condition}
 						<tr><th>Condition</th><td>{data.watch.condition}</td></tr>
+					{/if}
+					{#if data.watch.lastServiced}
+						<tr><th>Last serviced</th><td class="num">{data.watch.lastServiced}</td></tr>
 					{/if}
 					{#if data.watch.status === 'sold'}
 						{#if data.watch.soldDate}
