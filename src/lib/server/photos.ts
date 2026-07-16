@@ -1,32 +1,46 @@
 import { eq } from 'drizzle-orm';
-import fs from 'node:fs';
-import path from 'node:path';
+import sharp from 'sharp';
 import type { DB } from './db';
 import { watchPhotos, type WatchPhoto } from './db/schema';
-import { config } from './config';
+import { getStorage, type PhotoStorage } from './storage';
+import { StateError } from './sessions';
 
 export function photoUrl(filePath: string): string {
 	return `/photos/${filePath}`;
 }
 
-export async function savePhoto(db: DB, watchId: number, file: File): Promise<WatchPhoto> {
-	const ext = path.extname(file.name).toLowerCase() || '.jpg';
-	const rel = path.join(String(watchId), `${crypto.randomUUID()}${ext}`);
-	const abs = path.join(config.dataDir, 'photos', rel);
-	fs.mkdirSync(path.dirname(abs), { recursive: true });
-	fs.writeFileSync(abs, Buffer.from(await file.arrayBuffer()));
+export async function savePhoto(
+	db: DB,
+	watchId: number,
+	file: File,
+	storage: PhotoStorage = getStorage()
+): Promise<WatchPhoto> {
+	if (!file.type.startsWith('image/')) {
+		throw new StateError(`Unsupported file type: ${file.type || 'unknown'}`);
+	}
+	const webp = await sharp(Buffer.from(await file.arrayBuffer()))
+		.rotate()
+		.resize(2000, 2000, { fit: 'inside', withoutEnlargement: true })
+		.webp({ quality: 80 })
+		.toBuffer();
+	const key = `${watchId}/${crypto.randomUUID()}.webp`;
+	await storage.put(key, webp);
 	const isFirst = !(
 		await db.select().from(watchPhotos).where(eq(watchPhotos.watchId, watchId)).limit(1)
 	)[0];
 	return (
-		await db.insert(watchPhotos).values({ watchId, filePath: rel, isPrimary: isFirst }).returning()
+		await db.insert(watchPhotos).values({ watchId, filePath: key, isPrimary: isFirst }).returning()
 	)[0];
 }
 
-export async function deletePhoto(db: DB, photoId: number): Promise<void> {
+export async function deletePhoto(
+	db: DB,
+	photoId: number,
+	storage: PhotoStorage = getStorage()
+): Promise<void> {
 	const p = (await db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).limit(1))[0];
 	if (!p) return;
-	fs.rmSync(path.join(config.dataDir, 'photos', p.filePath), { force: true });
+	await storage.delete(p.filePath);
 	await db.delete(watchPhotos).where(eq(watchPhotos.id, photoId));
 }
 
