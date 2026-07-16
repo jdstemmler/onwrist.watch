@@ -15,22 +15,24 @@ export async function savePhoto(db: DB, watchId: number, file: File): Promise<Wa
 	const abs = path.join(config.dataDir, 'photos', rel);
 	fs.mkdirSync(path.dirname(abs), { recursive: true });
 	fs.writeFileSync(abs, Buffer.from(await file.arrayBuffer()));
-	const isFirst = !db.select().from(watchPhotos).where(eq(watchPhotos.watchId, watchId)).get();
-	return db.insert(watchPhotos)
-		.values({ watchId, filePath: rel, isPrimary: isFirst })
-		.returning().get();
+	const isFirst = !(
+		await db.select().from(watchPhotos).where(eq(watchPhotos.watchId, watchId)).limit(1)
+	)[0];
+	return (
+		await db.insert(watchPhotos).values({ watchId, filePath: rel, isPrimary: isFirst }).returning()
+	)[0];
 }
 
-export function deletePhoto(db: DB, photoId: number): void {
-	const p = db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).get();
+export async function deletePhoto(db: DB, photoId: number): Promise<void> {
+	const p = (await db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).limit(1))[0];
 	if (!p) return;
 	fs.rmSync(path.join(config.dataDir, 'photos', p.filePath), { force: true });
-	db.delete(watchPhotos).where(eq(watchPhotos.id, photoId)).run();
+	await db.delete(watchPhotos).where(eq(watchPhotos.id, photoId));
 }
 
-export function setPrimaryPhoto(db: DB, photoId: number): void {
-	const p = db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).get();
+export async function setPrimaryPhoto(db: DB, photoId: number): Promise<void> {
+	const p = (await db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).limit(1))[0];
 	if (!p) return;
-	db.update(watchPhotos).set({ isPrimary: false }).where(eq(watchPhotos.watchId, p.watchId)).run();
-	db.update(watchPhotos).set({ isPrimary: true }).where(eq(watchPhotos.id, photoId)).run();
+	await db.update(watchPhotos).set({ isPrimary: false }).where(eq(watchPhotos.watchId, p.watchId));
+	await db.update(watchPhotos).set({ isPrimary: true }).where(eq(watchPhotos.id, photoId));
 }

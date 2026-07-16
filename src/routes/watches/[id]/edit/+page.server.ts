@@ -7,27 +7,27 @@ import { watchFormSchema, updateWatch, deleteWatch } from '$lib/server/watches';
 import { savePhoto, deletePhoto, setPrimaryPhoto } from '$lib/server/photos';
 
 function findWatch(db: DB, id: number) {
-	return db.select().from(watches).where(eq(watches.id, id)).get();
+	return db.select().from(watches).where(eq(watches.id, id)).limit(1).then((rows) => rows[0]);
 }
 
 export const load: PageServerLoad = async ({ params }) => {
-	const db = getDb();
+	const db = await getDb();
 	const id = Number(params.id);
-	const watch = findWatch(db, id);
+	const watch = await findWatch(db, id);
 	if (!watch) throw error(404, 'Watch not found');
-	const photos = db.select().from(watchPhotos).where(eq(watchPhotos.watchId, id)).all();
+	const photos = await db.select().from(watchPhotos).where(eq(watchPhotos.watchId, id));
 	return { watch, photos };
 };
 
 export const actions: Actions = {
 	update: async ({ request, params }) => {
 		const id = Number(params.id);
-		const db = getDb();
-		if (!findWatch(db, id)) return fail(404, { message: 'Watch not found' });
+		const db = await getDb();
+		if (!(await findWatch(db, id))) return fail(404, { message: 'Watch not found' });
 		const form = await request.formData();
 		const parsed = watchFormSchema.safeParse(Object.fromEntries(form));
 		if (!parsed.success) return fail(400, { message: 'Check the highlighted fields' });
-		updateWatch(db, id, parsed.data);
+		await updateWatch(db, id, parsed.data);
 		const photo = form.get('photo');
 		if (photo instanceof File && photo.size > 0) await savePhoto(db, id, photo);
 		redirect(303, `/watches/${id}`);
@@ -35,29 +35,29 @@ export const actions: Actions = {
 
 	deletePhoto: async ({ request, params }) => {
 		const id = Number(params.id);
-		const db = getDb();
-		if (!findWatch(db, id)) return fail(404, { message: 'Watch not found' });
+		const db = await getDb();
+		if (!(await findWatch(db, id))) return fail(404, { message: 'Watch not found' });
 		const form = await request.formData();
 		const photoId = Number(form.get('photoId'));
-		deletePhoto(db, photoId);
+		await deletePhoto(db, photoId);
 		return { success: true };
 	},
 
 	setPrimary: async ({ request, params }) => {
 		const id = Number(params.id);
-		const db = getDb();
-		if (!findWatch(db, id)) return fail(404, { message: 'Watch not found' });
+		const db = await getDb();
+		if (!(await findWatch(db, id))) return fail(404, { message: 'Watch not found' });
 		const form = await request.formData();
 		const photoId = Number(form.get('photoId'));
-		setPrimaryPhoto(db, photoId);
+		await setPrimaryPhoto(db, photoId);
 		return { success: true };
 	},
 
 	delete: async ({ params }) => {
 		const id = Number(params.id);
-		const db = getDb();
-		if (!findWatch(db, id)) return fail(404, { message: 'Watch not found' });
-		deleteWatch(db, id);
+		const db = await getDb();
+		if (!(await findWatch(db, id))) return fail(404, { message: 'Watch not found' });
+		await deleteWatch(db, id);
 		redirect(303, `/`);
 	}
 };

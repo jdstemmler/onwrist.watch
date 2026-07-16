@@ -4,18 +4,17 @@ import { config } from '$lib/server/config';
 import { statsByDow, statsByTod, statsTodByWatch, statsByWatch, statsCalendar, statsSummary } from '$lib/server/stats';
 
 export const load: PageServerLoad = async ({ url }) => {
-	const db = getDb();
+	const db = await getDb();
 	const tz = config.homeTz;
 	const now = new Date();
 	const year = Number(url.searchParams.get('year') ?? now.getFullYear());
-	return {
-		year,
-		summary: statsSummary(db, tz, now),
-		byWatch: statsByWatch(db, tz, now),
-		byDow: statsByDow(db, tz, now),
-		byTod: statsByTod(db, tz, now),
-		todByWatch: statsTodByWatch(db, tz, now),
-		calendar: statsCalendar(db, tz, year, now),
-		nowIso: now.toISOString()
-	};
+	const [summary, byWatch, byDow, byTod, todByWatch, calendar] = await Promise.all([
+		statsSummary(db, tz, now),
+		statsByWatch(db, tz, now),
+		statsByDow(db, tz, now),
+		statsByTod(db, tz, now),
+		statsTodByWatch(db, tz, now),
+		statsCalendar(db, tz, year, now)
+	]);
+	return { year, summary, byWatch, byDow, byTod, todByWatch, calendar, nowIso: now.toISOString() };
 };
