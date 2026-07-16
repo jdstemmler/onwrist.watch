@@ -3,8 +3,8 @@
 A single-user, self-hosted watch-collection tracker: inventory management,
 low-friction wear-session logging via an installable PWA, and a stats
 dashboard (day-of-week, time-of-day, total wear, cost-per-wear, calendar
-views). Runs as one SvelteKit container on a homelab, reachable from
-anywhere via cloudflared.
+views). Runs as a SvelteKit app + Postgres via docker compose on a
+homelab, reachable from anywhere via cloudflared.
 
 ![dashboard screenshot placeholder](docs/screenshot.png)
 <!-- TODO: replace with a real screenshot after first deploy -->
