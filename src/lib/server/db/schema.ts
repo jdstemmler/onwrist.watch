@@ -55,6 +55,15 @@ export const wearSessions = sqliteTable('wear_sessions', {
 	...timestamps
 });
 
+export const authSessions = sqliteTable('auth_sessions', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	tokenHash: text('token_hash').notNull().unique(),
+	createdAt: integer('created_at', { mode: 'timestamp_ms' })
+		.notNull()
+		.$defaultFn(() => new Date()),
+	expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+});
+
 export type Watch = typeof watches.$inferSelect;
 export type WatchPhoto = typeof watchPhotos.$inferSelect;
 export type WearSession = typeof wearSessions.$inferSelect;

@@ -22,7 +22,6 @@ describe('getState', () => {
 		expect(s.valid_actions).toEqual(['put_on']);
 		expect(s.status_line).toBe('No watch on');
 		expect(s.watches.map((w) => w.id)).toEqual([speedy, datejust]); // sold Seiko excluded
-		expect(s.watch_menu).toEqual({ Speedy: speedy, 'Rolex Datejust': datejust });
 	});
 
 	it('wearing: swap/take_off valid, worn watch excluded from list', () => {
@@ -32,15 +31,6 @@ describe('getState', () => {
 		expect(s.valid_actions).toEqual(['swap', 'take_off']);
 		expect(s.status_line).toBe('Wearing: Speedy — since 7:42 AM');
 		expect(s.watches.map((w) => w.id)).toEqual([datejust]);
-		// menu keeps the worn watch so backfill can target it
-		expect(s.watch_menu).toEqual({ Speedy: speedy, 'Rolex Datejust': datejust });
-	});
-
-	it('watch_menu disambiguates duplicate labels', () => {
-		const dup = db.insert(watches).values({ brand: 'Rolex', model: 'Datejust' }).returning().get().id;
-		const s = getState(db, TZ);
-		expect(s.watch_menu['Rolex Datejust']).toBe(datejust);
-		expect(s.watch_menu[`Rolex Datejust (#${dup})`]).toBe(dup);
 	});
 
 	it('after take-off: status line names last watch and time', () => {

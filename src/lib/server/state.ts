@@ -9,11 +9,6 @@ export type StateResponse = {
 	wearing: { id: number; label: string; since: string } | null;
 	valid_actions: ('put_on' | 'swap' | 'take_off')[];
 	watches: { id: number; label: string }[];
-	// label -> id for ALL owned watches (worn included), recency-ordered.
-	// Shaped for iOS Shortcuts: "Choose from List" over a dictionary shows
-	// keys as rows and yields the value, so the shortcut never has to dig
-	// an id out of a nested dictionary. Duplicate labels get a "(#id)" suffix.
-	watch_menu: Record<string, number>;
 };
 
 export function getState(db: DB, tz: string): StateResponse {
@@ -35,11 +30,6 @@ export function getState(db: DB, tz: string): StateResponse {
 		.filter((r) => r.watch.id !== open?.watchId)
 		.map((r) => ({ id: r.watch.id, label: watchLabel(r.watch) }));
 
-	const watch_menu: Record<string, number> = {};
-	for (const r of owned) {
-		const label = watchLabel(r.watch);
-		watch_menu[label in watch_menu ? `${label} (#${r.watch.id})` : label] = r.watch.id;
-	}
 
 	if (open) {
 		const w = owned.find((r) => r.watch.id === open.watchId)?.watch
@@ -49,8 +39,7 @@ export function getState(db: DB, tz: string): StateResponse {
 			status_line: `Wearing: ${label} — since ${formatTime(open.startedAt, tz)}`,
 			wearing: { id: w.id, label, since: open.startedAt.toISOString() },
 			valid_actions: ['swap', 'take_off'],
-			watches: list,
-			watch_menu
+			watches: list
 		};
 	}
 
@@ -66,5 +55,5 @@ export function getState(db: DB, tz: string): StateResponse {
 		const w = db.select().from(watches).where(eq(watches.id, last.watchId)).get()!;
 		status_line = `No watch on — took off ${watchLabel(w)} at ${formatTime(last.endedAt!, tz)}`;
 	}
-	return { status_line, wearing: null, valid_actions: ['put_on'], watches: list, watch_menu };
+	return { status_line, wearing: null, valid_actions: ['put_on'], watches: list };
 }

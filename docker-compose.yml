@@ -4,7 +4,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      AUTH_TOKEN: ${AUTH_TOKEN:?set AUTH_TOKEN in .env}
+      DASH_PASSWORD: ${DASH_PASSWORD:?set DASH_PASSWORD in .env}
+      SESSION_DAYS: ${SESSION_DAYS:-30}
       APP_NAME: ${APP_NAME:-horolog}
       # adapter-node caps request bodies at 512K by default — far below a
       # phone photo. Governs the photo-upload forms.

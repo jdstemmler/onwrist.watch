@@ -1,12 +1,16 @@
-import { json, type Handle } from '@sveltejs/kit';
-import { isAuthorized } from '$lib/server/api';
+import { redirect, type Handle } from '@sveltejs/kit';
+import { SESSION_COOKIE, routeClass, validateSession } from '$lib/server/auth';
 import { config } from '$lib/server/config';
+import { getDb } from '$lib/server/db';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	if (event.url.pathname.startsWith('/api')) {
-		if (!isAuthorized(event.request, config.authToken)) {
-			return json({ message: 'Unauthorized' }, { status: 401 });
-		}
+	const { pathname, search } = event.url;
+	if (routeClass(pathname) === 'public') return resolve(event);
+
+	const token = event.cookies.get(SESSION_COOKIE) ?? '';
+	if (!token || !validateSession(getDb(), token, config.sessionDays)) {
+		const next = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname + search)}`;
+		redirect(303, `/login${next}`);
 	}
 	return resolve(event);
 };

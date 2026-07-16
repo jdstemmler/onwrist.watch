@@ -13,13 +13,14 @@ anywhere via cloudflared.
 
 ```sh
 cp .env.example .env
-# edit .env: set AUTH_TOKEN to a real secret (protects the JSON API) and
-# ORIGIN to the exact URL you'll load the dashboard from
+# edit .env: set DASH_PASSWORD (the login password) and ORIGIN to the
+# exact URL you'll load the dashboard from
 docker compose up -d
 ```
 
-The app serves the dashboard and a bearer-token JSON API (`/api/*`) from
-one process on port 3000.
+The app serves on port 3000. Every page sits behind a single-password
+"wrist check" login; sessions last 30 days (sliding) so your phone stays
+logged in.
 
 ## Logging wear from your phone
 
@@ -32,24 +33,15 @@ workflow — no companion app or shortcut needed.
 
 Point your existing cloudflared tunnel at `localhost:3000`. This is a
 **later** step, not required to use the app — on your home LAN the app works
-as-is (the dashboard is unauthenticated on the LAN; the API is protected by
-the bearer token). When you add the tunnel, put Cloudflare Access in front of
-every route. The `/api/*` surface is only used by scripts/automation you
-write yourself; if you have none, no Access bypass is needed at all.
+as-is, protected by its own login. Cloudflare Access on top is optional
+belt-and-suspenders — the app no longer depends on edge auth.
 
 Remember to update `ORIGIN` in `.env` to the tunnel hostname when you switch.
-
-## The JSON API (optional)
-
-`/api/*` (state, put-on, swap, take-off, backfill, stats) is bearer-token
-protected and exists for automation. One historical client is documented in
-[`docs/shortcut.md`](docs/shortcut.md) — a step-by-step iOS Shortcut build —
-kept for reference; the PWA replaced it as the primary logger.
 
 ## Development
 
 ```sh
-npm run dev          # dev server (set AUTH_TOKEN=dev)
+npm run dev          # dev server (set DASH_PASSWORD=dev)
 npm test             # Vitest suite — must be green before any commit
 npm run check        # svelte-check / typecheck
 npm run db:generate  # generate a Drizzle migration after schema changes

@@ -47,6 +47,9 @@
 	<button class="theme" onclick={cycleTheme} title="Theme: {theme}" aria-label="Theme: {theme}">
 		<span aria-hidden="true">{GLYPH[theme]}</span><span class="theme-label">{theme}</span>
 	</button>
+	<form method="POST" action="/login?/logout" class="logout">
+		<button type="submit" title="Lock" aria-label="Lock">&#9919;</button>
+	</form>
 </nav>
 
 <style>
@@ -113,6 +116,21 @@
 			font-size: 0.95rem;
 			padding: 0.15rem 0.25rem;
 		}
+	}
+
+	.logout {
+		display: contents;
+	}
+	.logout button {
+		background: none;
+		border: none;
+		padding: 0.15rem 0.25rem;
+		font-size: 0.95rem;
+		color: var(--fg-muted);
+	}
+	.logout button:hover {
+		color: var(--fg);
+		border: none;
 	}
 
 	.brand {
