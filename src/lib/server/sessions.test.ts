@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
-import { watches, wearSessions } from './db/schema';
+import { users, watches, wearSessions } from './db/schema';
 import {
 	StateError, watchLabel, getOpenSession,
 	putOn, swap, takeOff, createSession, updateSession, deleteSession
@@ -14,8 +14,9 @@ const T = (s: string) => new Date(s);
 
 beforeEach(async () => {
 	db = await createTestDb();
-	speedy = (await db.insert(watches).values({ brand: 'Omega', model: 'Speedmaster', nickname: 'Speedy' }).returning())[0].id;
-	datejust = (await db.insert(watches).values({ brand: 'Rolex', model: 'Datejust' }).returning())[0].id;
+	const [u] = await db.insert(users).values({ email: 'a@b.com', passwordHash: 'x' }).returning();
+	speedy = (await db.insert(watches).values({ userId: u.id, brand: 'Omega', model: 'Speedmaster', nickname: 'Speedy' }).returning())[0].id;
+	datejust = (await db.insert(watches).values({ userId: u.id, brand: 'Rolex', model: 'Datejust' }).returning())[0].id;
 });
 
 describe('watchLabel', () => {

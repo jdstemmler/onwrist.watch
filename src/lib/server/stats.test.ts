@@ -1,23 +1,25 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { DB } from './db';
 import { createTestDb } from './db/test-utils';
-import { watches } from './db/schema';
+import { users, watches } from './db/schema';
 import { createSession, putOn } from './sessions';
 import { sliceSession, statsByWatch, statsByDow, statsByTod, statsTodByWatch, statsCalendar, statsSummary } from './stats';
 
 const TZ = 'America/Los_Angeles';
 const NOW = new Date('2026-07-15T00:00:00Z'); // 5 PM PDT July 14
 let db: DB;
+let userId: number;
 let speedy: number, datejust: number;
 
 beforeEach(async () => {
 	db = await createTestDb();
+	userId = (await db.insert(users).values({ email: 'a@b.com', passwordHash: 'x' }).returning())[0].id;
 	speedy = (
 		await db.insert(watches)
-			.values({ brand: 'Omega', model: 'Speedmaster', nickname: 'Speedy', pricePaidCents: 500000 })
+			.values({ userId, brand: 'Omega', model: 'Speedmaster', nickname: 'Speedy', pricePaidCents: 500000 })
 			.returning()
 	)[0].id;
-	datejust = (await db.insert(watches).values({ brand: 'Rolex', model: 'Datejust' }).returning())[0].id;
+	datejust = (await db.insert(watches).values({ userId, brand: 'Rolex', model: 'Datejust' }).returning())[0].id;
 });
 
 describe('sliceSession', () => {
@@ -59,7 +61,7 @@ describe('statsByWatch gifts', () => {
 	it('a gift never gets a cost-per-wear, even with a recorded value', async () => {
 		const gifted = (
 			await db.insert(watches)
-				.values({ brand: 'Timex', model: 'Snoopy Chrono', pricePaidCents: 12000, isGift: true })
+				.values({ userId, brand: 'Timex', model: 'Snoopy Chrono', pricePaidCents: 12000, isGift: true })
 				.returning()
 		)[0].id;
 		await createSession(db, { watchId: gifted, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });

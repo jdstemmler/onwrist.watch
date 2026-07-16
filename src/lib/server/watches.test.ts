@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
+import { users } from './db/schema';
 import { watchFormSchema, createWatch, updateWatch } from './watches';
 
 describe('watchFormSchema', () => {
@@ -46,6 +47,9 @@ describe('watch crud', () => {
 
 	beforeEach(async () => {
 		db = await createTestDb();
+		// createWatch hardcodes userId: 1 for now (see watches.ts); fixture user
+		// must exist as the sole/first insert so its id lines up.
+		await db.insert(users).values({ email: 'a@b.com', passwordHash: 'x' });
 	});
 
 	it('creates and updates', async () => {

@@ -23,9 +23,12 @@ const hashToken = (token: string) => crypto.createHash('sha256').update(token).d
 /** Creates a session row and returns the (unhashed) cookie token. */
 export async function createSession(db: DB, days: number, now = new Date()): Promise<string> {
 	const token = crypto.randomBytes(32).toString('base64url');
-	await db
-		.insert(authSessions)
-		.values({ tokenHash: hashToken(token), expiresAt: new Date(now.getTime() + days * DAY) });
+	await db.insert(authSessions).values({
+		// Task 8 deletes wrist-check login
+		userId: 1,
+		tokenHash: hashToken(token),
+		expiresAt: new Date(now.getTime() + days * DAY)
+	});
 	return token;
 }
 

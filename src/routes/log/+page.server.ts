@@ -2,13 +2,17 @@ import { fail } from '@sveltejs/kit';
 import { desc, eq } from 'drizzle-orm';
 import type { Actions, PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
-import { config } from '$lib/server/config';
 import { watches, wearSessions } from '$lib/server/db/schema';
 import { getState } from '$lib/server/state';
 import {
 	StateError, createSession, deleteSession, putOn, swap, takeOff, updateSession, watchLabel
 } from '$lib/server/sessions';
 import { localInputToUtc, toLocalInput } from '$lib/server/time';
+
+// Task 8 replaces with locals.user.homeTz
+const HOME_TZ = 'America/Los_Angeles';
+// Task 8 replaces with locals.user.staleSessionHours
+const STALE_SESSION_HOURS = 24;
 
 // Shown as the banner headline when nothing is on-wrist. Picked server-side
 // per page load so SSR and hydration agree. `{n}` = owned-watch count.
@@ -29,7 +33,7 @@ const EMPTY_WRIST_QUIPS = [
 
 export const load: PageServerLoad = async () => {
 	const db = await getDb();
-	const state = await getState(db, config.homeTz);
+	const state = await getState(db, HOME_TZ);
 	const quip = EMPTY_WRIST_QUIPS[Math.floor(Math.random() * EMPTY_WRIST_QUIPS.length)].replace(
 		'{n}',
 		String(state.watches.length)
@@ -44,12 +48,12 @@ export const load: PageServerLoad = async () => {
 	).map(({ session, watch }) => ({
 			...session,
 			label: watchLabel(watch),
-			startedLocal: toLocalInput(session.startedAt, config.homeTz),
-			endedLocal: session.endedAt ? toLocalInput(session.endedAt, config.homeTz) : ''
+			startedLocal: toLocalInput(session.startedAt, HOME_TZ),
+			endedLocal: session.endedAt ? toLocalInput(session.endedAt, HOME_TZ) : ''
 		}));
 	const open = sessions.find((s) => s.endedAt === null);
 	const stale =
-		!!open && Date.now() - open.startedAt.getTime() > config.staleSessionHours * 3_600_000;
+		!!open && Date.now() - open.startedAt.getTime() > STALE_SESSION_HOURS * 3_600_000;
 	return { state, sessions, stale, quip, allWatches: state.wearing
 		? [...state.watches, { id: state.wearing.id, label: state.wearing.label }]
 		: state.watches };
@@ -90,9 +94,9 @@ export const actions: Actions = {
 		try {
 			await createSession(await getDb(), {
 				watchId: Number(f.get('watch_id')),
-				startedAt: localInputToUtc(f.get('started_at') as string, config.homeTz),
+				startedAt: localInputToUtc(f.get('started_at') as string, HOME_TZ),
 				endedAt: f.get('ended_at')
-					? localInputToUtc(f.get('ended_at') as string, config.homeTz)
+					? localInputToUtc(f.get('ended_at') as string, HOME_TZ)
 					: null,
 				note: (f.get('note') as string) || undefined,
 				source: 'backfill'
@@ -120,12 +124,12 @@ export const actions: Actions = {
 				startedAt:
 					startedAtRaw === startedAtOrig
 						? undefined
-						: localInputToUtc(startedAtRaw, config.homeTz),
+						: localInputToUtc(startedAtRaw, HOME_TZ),
 				endedAt:
 					endedAtRaw === endedAtOrig
 						? undefined
 						: endedAtRaw
-							? localInputToUtc(endedAtRaw, config.homeTz)
+							? localInputToUtc(endedAtRaw, HOME_TZ)
 							: null,
 				note: (f.get('note') as string) || null
 			});

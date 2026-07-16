@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
-import { watches } from './db/schema';
+import { users, watches } from './db/schema';
 import { putOn, takeOff, createSession } from './sessions';
 import { getState } from './state';
 
@@ -11,9 +11,10 @@ let speedy: number, datejust: number, seiko: number;
 
 beforeEach(async () => {
 	db = await createTestDb();
-	speedy = (await db.insert(watches).values({ brand: 'Omega', model: 'Speedmaster', nickname: 'Speedy' }).returning())[0].id;
-	datejust = (await db.insert(watches).values({ brand: 'Rolex', model: 'Datejust' }).returning())[0].id;
-	seiko = (await db.insert(watches).values({ brand: 'Seiko', model: 'SKX007', status: 'sold' }).returning())[0].id;
+	const [u] = await db.insert(users).values({ email: 'a@b.com', passwordHash: 'x' }).returning();
+	speedy = (await db.insert(watches).values({ userId: u.id, brand: 'Omega', model: 'Speedmaster', nickname: 'Speedy' }).returning())[0].id;
+	datejust = (await db.insert(watches).values({ userId: u.id, brand: 'Rolex', model: 'Datejust' }).returning())[0].id;
+	seiko = (await db.insert(watches).values({ userId: u.id, brand: 'Seiko', model: 'SKX007', status: 'sold' }).returning())[0].id;
 });
 
 describe('getState', () => {

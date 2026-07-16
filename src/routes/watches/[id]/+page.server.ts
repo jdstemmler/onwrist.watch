@@ -2,10 +2,12 @@ import { error } from '@sveltejs/kit';
 import { desc, eq } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
-import { config } from '$lib/server/config';
 import { watches, watchPhotos, wearSessions } from '$lib/server/db/schema';
 import { statsByWatch, statsByDow } from '$lib/server/stats';
 import { photoUrl } from '$lib/server/photos';
+
+// Task 8 replaces with locals.user.homeTz
+const HOME_TZ = 'America/Los_Angeles';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const db = await getDb();
@@ -15,8 +17,8 @@ export const load: PageServerLoad = async ({ params }) => {
 	const now = new Date();
 	const [photos, statsRows, dowRows, sessions] = await Promise.all([
 		db.select().from(watchPhotos).where(eq(watchPhotos.watchId, id)),
-		statsByWatch(db, config.homeTz, now),
-		statsByDow(db, config.homeTz, now),
+		statsByWatch(db, HOME_TZ, now),
+		statsByDow(db, HOME_TZ, now),
 		db
 			.select()
 			.from(wearSessions)

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { DB } from './db';
 import { createTestDb } from './db/test-utils';
-import { authSessions } from './db/schema';
+import { authSessions, users } from './db/schema';
 import {
 	verifyPassword,
 	createSession,
@@ -21,6 +21,9 @@ const at = (days: number) => new Date(T0.getTime() + days * DAY);
 let db: DB;
 beforeEach(async () => {
 	db = await createTestDb();
+	// createSession hardcodes userId: 1 for now (see auth.ts); fixture user
+	// must exist as the sole/first insert so its id lines up.
+	await db.insert(users).values({ email: 'a@b.com', passwordHash: 'x' });
 	recordLoginSuccess(); // reset throttle state between tests
 });
 

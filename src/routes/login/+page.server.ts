@@ -37,7 +37,8 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const password = (form.get('password') as string) ?? '';
 		const next = safeNext(form.get('next') as string | null);
-		if (!verifyPassword(password, config.dashPassword)) {
+		// Task 8 deletes wrist-check login
+		if (!verifyPassword(password, process.env.DASH_PASSWORD ?? '')) {
 			recordLoginFailure();
 			return fail(401, { message: 'Not it. Check again.' });
 		}

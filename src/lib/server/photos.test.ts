@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
 import { watchFormSchema, createWatch } from './watches';
-import { watchPhotos } from './db/schema';
+import { users, watchPhotos } from './db/schema';
 import { savePhoto, deletePhoto, setPrimaryPhoto } from './photos';
 import { createFsStorage } from './storage/fs';
 import { StateError } from './sessions';
@@ -32,6 +32,9 @@ describe('photos', () => {
 
 	beforeEach(async () => {
 		db = await createTestDb();
+		// createWatch hardcodes userId: 1 for now (see watches.ts); fixture user
+		// must exist as the sole/first insert so its id lines up.
+		await db.insert(users).values({ email: 'a@b.com', passwordHash: 'x' });
 		root = fs.mkdtempSync(path.join(os.tmpdir(), 'horolog-photos-'));
 		storage = createFsStorage(root);
 	});

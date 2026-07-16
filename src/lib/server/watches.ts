@@ -45,7 +45,8 @@ export const watchFormSchema = z
 export type WatchFormData = z.infer<typeof watchFormSchema>;
 
 export async function createWatch(db: DB, data: WatchFormData): Promise<Watch> {
-	return (await db.insert(watches).values(data).returning())[0];
+	// Task 6/7: take userId from the caller's session instead of hardcoding.
+	return (await db.insert(watches).values({ ...data, userId: 1 }).returning())[0];
 }
 
 export async function updateWatch(db: DB, id: number, data: WatchFormData): Promise<Watch> {

@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { createDb } from '../src/lib/server/db';
-import { watches } from '../src/lib/server/db/schema';
+import { users, watches } from '../src/lib/server/db/schema';
 import { createSession, putOn } from '../src/lib/server/sessions';
 
 const pool = new Pool({
@@ -15,6 +15,12 @@ if ((await db.select().from(watches)).length > 0) {
 	await pool.end();
 	process.exit(1);
 }
+
+// Task 6 makes this a real account created via signup; placeholder for now.
+const [seedUser] = await db
+	.insert(users)
+	.values({ email: 'seed@onwrist.local', passwordHash: 'x' })
+	.returning();
 
 // Deterministic PRNG so reseeding is reproducible.
 function mulberry32(a: number) {
@@ -45,7 +51,7 @@ const COLLECTION = [
 
 const ids: number[] = [];
 for (const w of COLLECTION) {
-	ids.push((await db.insert(watches).values({ ...w }).returning())[0].id);
+	ids.push((await db.insert(watches).values({ ...w, userId: seedUser.id }).returning())[0].id);
 }
 
 // Favorites get worn more: weight by position (earlier = more worn).
