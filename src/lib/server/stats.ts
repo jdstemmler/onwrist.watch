@@ -90,6 +90,21 @@ export function statsByDow(db: DB, tz: string, now: Date) {
 	});
 }
 
+export function statsTodByWatch(db: DB, tz: string, now: Date) {
+	const { ws, clamped } = loadAll(db, now);
+	const labels = new Map(ws.map((w) => [w.id, watchLabel(w)]));
+	const acc = new Map<string, number>(); // `${hour}:${watchId}` -> minutes
+	for (const s of clamped)
+		for (const slice of sliceSession(s.startedAt, s.endedAt, tz)) {
+			const k = `${slice.hour}:${s.watchId}`;
+			acc.set(k, (acc.get(k) ?? 0) + slice.minutes);
+		}
+	return [...acc.entries()].map(([k, minutes]) => {
+		const [hour, watchId] = k.split(':').map(Number);
+		return { hour, watchId, label: labels.get(watchId)!, hours: minutes / 60 };
+	});
+}
+
 export function statsByTod(db: DB, tz: string, now: Date) {
 	const { sessions, clamped } = loadAll(db, now);
 	const putOnByHour = Array(24).fill(0);

@@ -4,6 +4,7 @@
 	import WristShare from '$lib/components/charts/WristShare.svelte';
 	import DowChart from '$lib/components/charts/DowChart.svelte';
 	import TodChart from '$lib/components/charts/TodChart.svelte';
+	import TodByWatchChart from '$lib/components/charts/TodByWatchChart.svelte';
 	import CalendarHeatmap from '$lib/components/charts/CalendarHeatmap.svelte';
 	import RotationHealth from '$lib/components/charts/RotationHealth.svelte';
 
@@ -61,6 +62,12 @@
 	<h2>Time of day</h2>
 	<p class="muted">When watches go on, and how much of the day they stay on.</p>
 	<TodChart putOnByHour={data.byTod.putOnByHour} wearingShareByHour={data.byTod.wearingShareByHour} />
+</section>
+
+<section class="card">
+	<h2>Watch by time of day</h2>
+	<p class="muted">Which watch owns which hour, all time.</p>
+	<TodByWatchChart rows={data.todByWatch} {colorSlots} />
 </section>
 
 <section class="card">

@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
 import { config } from '$lib/server/config';
-import { statsByDow, statsByTod, statsByWatch, statsCalendar, statsSummary } from '$lib/server/stats';
+import { statsByDow, statsByTod, statsTodByWatch, statsByWatch, statsCalendar, statsSummary } from '$lib/server/stats';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const db = getDb();
@@ -14,6 +14,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		byWatch: statsByWatch(db, tz, now),
 		byDow: statsByDow(db, tz, now),
 		byTod: statsByTod(db, tz, now),
+		todByWatch: statsTodByWatch(db, tz, now),
 		calendar: statsCalendar(db, tz, year, now),
 		nowIso: now.toISOString()
 	};

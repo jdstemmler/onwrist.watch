@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createDb, type DB } from './db';
 import { watches } from './db/schema';
 import { createSession, putOn } from './sessions';
-import { sliceSession, statsByWatch, statsByDow, statsByTod, statsCalendar, statsSummary } from './stats';
+import { sliceSession, statsByWatch, statsByDow, statsByTod, statsTodByWatch, statsCalendar, statsSummary } from './stats';
 
 const TZ = 'America/Los_Angeles';
 const NOW = new Date('2026-07-15T00:00:00Z'); // 5 PM PDT July 14
@@ -76,6 +76,18 @@ describe('statsByDow / statsByTod / statsCalendar / statsSummary', () => {
 		const rows = statsByDow(db, TZ, NOW);
 		expect(rows).toContainEqual({ dow: 1, watchId: speedy, label: 'Speedy', hours: 8 });
 		expect(rows).toContainEqual({ dow: 2, watchId: datejust, label: 'Rolex Datejust', hours: 8 });
+	});
+
+	it('tod-by-watch attributes hours to local hour per watch', () => {
+		const rows = statsTodByWatch(db, TZ, NOW);
+		// Speedy on 7AM-3PM Monday: full hour at 7
+		expect(rows).toContainEqual({ hour: 7, watchId: speedy, label: 'Speedy', hours: 1 });
+		// Datejust on 8AM-4PM Tuesday: full hour at 15, nothing at 7
+		expect(rows).toContainEqual({ hour: 15, watchId: datejust, label: 'Rolex Datejust', hours: 1 });
+		expect(rows.find((r) => r.hour === 7 && r.watchId === datejust)).toBeUndefined();
+		// both worn across 9 AM on their respective days
+		expect(rows).toContainEqual({ hour: 9, watchId: speedy, label: 'Speedy', hours: 1 });
+		expect(rows).toContainEqual({ hour: 9, watchId: datejust, label: 'Rolex Datejust', hours: 1 });
 	});
 
 	it('by-tod counts put-on hour and wearing share', () => {
