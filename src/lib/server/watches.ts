@@ -44,22 +44,24 @@ export const watchFormSchema = z
 
 export type WatchFormData = z.infer<typeof watchFormSchema>;
 
-export function createWatch(db: DB, data: WatchFormData): Watch {
-	return db.insert(watches).values(data).returning().get();
+export async function createWatch(db: DB, data: WatchFormData): Promise<Watch> {
+	return (await db.insert(watches).values(data).returning())[0];
 }
 
-export function updateWatch(db: DB, id: number, data: WatchFormData): Watch {
-	return db.update(watches).set({ ...data, updatedAt: new Date() }).where(eq(watches.id, id)).returning().get();
+export async function updateWatch(db: DB, id: number, data: WatchFormData): Promise<Watch> {
+	return (
+		await db.update(watches).set({ ...data, updatedAt: new Date() }).where(eq(watches.id, id)).returning()
+	)[0];
 }
 
-export function deleteWatch(db: DB, id: number): void {
-	db.delete(watches).where(eq(watches.id, id)).run();
+export async function deleteWatch(db: DB, id: number): Promise<void> {
+	await db.delete(watches).where(eq(watches.id, id));
 }
 
-export function listWatchesWithMeta(db: DB, tz: string, now: Date) {
-	const ws = db.select().from(watches).all();
-	const photos = db.select().from(watchPhotos).all();
-	const stats = new Map(statsByWatch(db, tz, now).map((s) => [s.watchId, s]));
+export async function listWatchesWithMeta(db: DB, tz: string, now: Date) {
+	const ws = await db.select().from(watches);
+	const photos = await db.select().from(watchPhotos);
+	const stats = new Map((await statsByWatch(db, tz, now)).map((s) => [s.watchId, s]));
 	return ws.map((watch) => ({
 		watch,
 		primaryPhoto:
