@@ -172,6 +172,7 @@ input[type='file'] {
 label.field {
 	display: flex;
 	flex-direction: column;
+	justify-content: flex-end; /* inputs stay row-aligned even if a label wraps */
 	gap: 0.35rem;
 	font-size: 0.85rem;
 	color: var(--fg-muted);

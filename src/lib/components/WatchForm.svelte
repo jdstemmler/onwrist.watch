@@ -84,11 +84,12 @@
 			<label class="check">
 				<input type="checkbox" name="isGift" bind:checked={isGift} />
 				<span>This was a gift</span>
+				{#if isGift}<span class="muted">— excluded from cost-per-wear</span>{/if}
 			</label>
 			<label class="field"><span class="lbl">{isGift ? 'Received date' : 'Purchase date'}</span>
 				<input name="purchaseDate" type="date" value={watch?.purchaseDate ?? ''} />
 			</label>
-			<label class="field"><span class="lbl">{isGift ? 'Est. value ($) — not counted in $/wear' : 'Price paid ($)'}</span>
+			<label class="field"><span class="lbl">{isGift ? 'Est. value ($)' : 'Price paid ($)'}</span>
 				<input name="pricePaid" type="number" step="0.01" min="0" value={centsToDollars(watch?.pricePaidCents)} />
 			</label>
 			<label class="field"><span class="lbl">Purchased from</span>
