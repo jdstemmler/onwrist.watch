@@ -1,10 +1,25 @@
 services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: onwrist
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: onwrist
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onwrist"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
   horolog:
     build: .
     ports:
       - "3000:3000"
     environment:
       DASH_PASSWORD: ${DASH_PASSWORD:?set DASH_PASSWORD in .env}
+      DATABASE_URL: postgres://onwrist:${POSTGRES_PASSWORD}@db:5432/onwrist
       SESSION_DAYS: ${SESSION_DAYS:-30}
       APP_NAME: ${APP_NAME:-horolog}
       # adapter-node caps request bodies at 512K by default — far below a
@@ -17,4 +32,10 @@ services:
       ORIGIN: ${ORIGIN:-http://localhost:3000}
     volumes:
       - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  pgdata:
