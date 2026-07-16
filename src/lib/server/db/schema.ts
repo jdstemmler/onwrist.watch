@@ -1,16 +1,16 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, real, boolean, timestamp } from 'drizzle-orm/pg-core';
 
 const timestamps = {
-	createdAt: integer('created_at', { mode: 'timestamp_ms' })
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
 		.notNull()
 		.$defaultFn(() => new Date()),
-	updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
 		.notNull()
 		.$defaultFn(() => new Date())
 };
 
-export const watches = sqliteTable('watches', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const watches = pgTable('watches', {
+	id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
 	brand: text('brand').notNull(),
 	model: text('model').notNull(),
 	referenceNo: text('reference_no'),
@@ -22,9 +22,9 @@ export const watches = sqliteTable('watches', {
 	lugMm: real('lug_mm'),
 	waterResistanceM: integer('water_resistance_m'),
 	strapNotes: text('strap_notes'),
-	purchaseDate: text('purchase_date'), // ISO date, e.g. 2024-11-02 (received date for gifts)
+	purchaseDate: text('purchase_date'), // ISO date; received date for gifts
 	pricePaidCents: integer('price_paid_cents'),
-	isGift: integer('is_gift', { mode: 'boolean' }).notNull().default(false),
+	isGift: boolean('is_gift').notNull().default(false),
 	purchasedFrom: text('purchased_from'),
 	boxPapers: text('box_papers', { enum: ['none', 'box', 'papers', 'both'] }),
 	condition: text('condition'),
@@ -36,35 +36,35 @@ export const watches = sqliteTable('watches', {
 	...timestamps
 });
 
-export const watchPhotos = sqliteTable('watch_photos', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const watchPhotos = pgTable('watch_photos', {
+	id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
 	watchId: integer('watch_id')
 		.notNull()
 		.references(() => watches.id, { onDelete: 'cascade' }),
-	filePath: text('file_path').notNull(), // relative to ${DATA_DIR}/photos
-	isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(false),
+	filePath: text('file_path').notNull(), // storage key, relative
+	isPrimary: boolean('is_primary').notNull().default(false),
 	sortOrder: integer('sort_order').notNull().default(0)
 });
 
-export const wearSessions = sqliteTable('wear_sessions', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const wearSessions = pgTable('wear_sessions', {
+	id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
 	watchId: integer('watch_id')
 		.notNull()
 		.references(() => watches.id, { onDelete: 'cascade' }),
-	startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
-	endedAt: integer('ended_at', { mode: 'timestamp_ms' }), // NULL = on wrist now
+	startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }).notNull(),
+	endedAt: timestamp('ended_at', { withTimezone: true, mode: 'date' }), // NULL = on wrist
 	note: text('note'),
 	source: text('source', { enum: ['shortcut', 'web', 'backfill'] }).notNull(),
 	...timestamps
 });
 
-export const authSessions = sqliteTable('auth_sessions', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const authSessions = pgTable('auth_sessions', {
+	id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
 	tokenHash: text('token_hash').notNull().unique(),
-	createdAt: integer('created_at', { mode: 'timestamp_ms' })
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
 		.notNull()
 		.$defaultFn(() => new Date()),
-	expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+	expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull()
 });
 
 export type Watch = typeof watches.$inferSelect;
