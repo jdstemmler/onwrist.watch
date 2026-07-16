@@ -32,7 +32,12 @@
 	method="POST"
 	action={editing ? '?/update' : undefined}
 	enctype="multipart/form-data"
-	use:enhance
+	use:enhance={() =>
+		async ({ update }) => {
+			// keep field values after photo delete/set-primary actions —
+			// the default reset() blanks Svelte-rendered inputs
+			await update({ reset: false });
+		}}
 >
 	<fieldset>
 		<legend>Watch</legend>
