@@ -26,8 +26,6 @@
 			timeZone: data.homeTz
 		}).format(new Date(d));
 
-	// most recent closed session (sessions arrive newest-first)
-	const lastOff = $derived(data.sessions.find((s) => s.endedAt !== null));
 
 	// Notes live behind a pencil icon + <dialog> so the logger stays compact;
 	// the textarea sits inside its action's <form>, so the value submits
@@ -59,13 +57,7 @@
 		</p>
 	{:else}
 		<p class="kicker"><span class="dot"></span>No watch on</p>
-		{#if lastOff}
-			<h1 class="watch-name">{lastOff.label}</h1>
-			<p class="sub num">taken off at {fmtTime(lastOff.endedAt!)}</p>
-		{:else}
-			<h1 class="watch-name">Nothing logged yet</h1>
-			<p class="sub">put a watch on below to start the record</p>
-		{/if}
+		<h1 class="watch-name quip">{data.quip}</h1>
 	{/if}
 	{#if data.stale}
 		<p class="nudge">⚠️ Still wearing this? Fix below.</p>
@@ -244,6 +236,11 @@
 		font-size: 1.5rem;
 		margin: 0;
 		line-height: 1.25;
+	}
+	.watch-name.quip {
+		font-size: 1.15rem;
+		font-weight: 500;
+		color: var(--fg-muted);
 	}
 	.sub {
 		font-size: 0.9rem;

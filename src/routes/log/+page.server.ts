@@ -10,9 +10,30 @@ import {
 } from '$lib/server/sessions';
 import { localInputToUtc, toLocalInput } from '$lib/server/time';
 
+// Shown as the banner headline when nothing is on-wrist. Picked server-side
+// per page load so SSR and hydration agree. `{n}` = owned-watch count.
+const EMPTY_WRIST_QUIPS = [
+	'Time is currently unsupervised.',
+	'Bare wrist. Bold choice.',
+	'Sundial mode engaged.',
+	'The rotation is idle.',
+	'Power reserves quietly draining.',
+	'Naked wrist detected.',
+	'Lume charged, nowhere to glow.',
+	'{n} watches. Zero on duty.',
+	'Somewhere a second hand sweeps unobserved.',
+	'Off the wrist, off the record.',
+	'No watch on. The audacity.',
+	'The valet tray is fully staffed.'
+];
+
 export const load: PageServerLoad = async () => {
 	const db = getDb();
 	const state = getState(db, config.homeTz);
+	const quip = EMPTY_WRIST_QUIPS[Math.floor(Math.random() * EMPTY_WRIST_QUIPS.length)].replace(
+		'{n}',
+		String(state.watches.length)
+	);
 	const sessions = db
 		.select({ session: wearSessions, watch: watches })
 		.from(wearSessions)
@@ -29,7 +50,7 @@ export const load: PageServerLoad = async () => {
 	const open = sessions.find((s) => s.endedAt === null);
 	const stale =
 		!!open && Date.now() - open.startedAt.getTime() > config.staleSessionHours * 3_600_000;
-	return { state, sessions, stale, allWatches: state.wearing
+	return { state, sessions, stale, quip, allWatches: state.wearing
 		? [...state.watches, { id: state.wearing.id, label: state.wearing.label }]
 		: state.watches };
 };
