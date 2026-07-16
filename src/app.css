@@ -29,8 +29,11 @@
 	color-scheme: light;
 }
 
+/* Dark tokens apply two ways: system preference (unless manually forced
+   light) and explicit data-theme="dark" set by the nav toggle. The two
+   blocks below MUST stay identical — update both together. */
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		--bg: #131614;
 		--bg-raised: #1b1f1c;
 		--fg: #e4e7e0;
@@ -46,6 +49,23 @@
 
 		color-scheme: dark;
 	}
+}
+
+:root[data-theme='dark'] {
+	--bg: #131614;
+	--bg-raised: #1b1f1c;
+	--fg: #e4e7e0;
+	--fg-muted: #8e978c;
+	--border: #343b34;
+	--accent: #a4b76a;
+	--accent-fg: #131614;
+	--navy: #8fb0d4;
+	--danger: #e2683a;
+	--danger-fg: #131614;
+
+	--shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.35);
+
+	color-scheme: dark;
 }
 
 * {

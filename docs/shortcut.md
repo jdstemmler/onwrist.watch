@@ -1,5 +1,10 @@
 # Building the "horolog" iOS Shortcut
 
+> **Status: reference only.** The installable PWA (`/log`, Add to Home
+> Screen) replaced the shortcut as the primary logger — it's as fast and
+> needs no maintenance in the Shortcuts app. This guide is kept for anyone
+> who wants Action Button / Back Tap / NFC triggers via the JSON API.
+
 This is a step-by-step guide for building the iOS Shortcut that drives horolog
 from your phone. It talks to the JSON API under `/api/*`, which is
 bearer-token authenticated (see `hooks.server.ts` / `AUTH_TOKEN`).

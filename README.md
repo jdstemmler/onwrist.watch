@@ -1,10 +1,10 @@
 # horolog
 
 A single-user, self-hosted watch-collection tracker: inventory management,
-low-friction wear-session logging (driven by an iOS Shortcut, with a PWA
-dashboard as fallback), and a stats dashboard (day-of-week, time-of-day,
-total wear, cost-per-wear, calendar views). Runs as one SvelteKit container
-on a homelab, reachable from anywhere via cloudflared.
+low-friction wear-session logging via an installable PWA, and a stats
+dashboard (day-of-week, time-of-day, total wear, cost-per-wear, calendar
+views). Runs as one SvelteKit container on a homelab, reachable from
+anywhere via cloudflared.
 
 ![dashboard screenshot placeholder](docs/screenshot.png)
 <!-- TODO: replace with a real screenshot after first deploy -->
@@ -13,31 +13,38 @@ on a homelab, reachable from anywhere via cloudflared.
 
 ```sh
 cp .env.example .env
-# edit .env and set AUTH_TOKEN to a real secret (used by the iOS Shortcut
-# and any other /api/* client — see docs/shortcut.md)
+# edit .env: set AUTH_TOKEN to a real secret (protects the JSON API) and
+# ORIGIN to the exact URL you'll load the dashboard from
 docker compose up -d
 ```
 
-The app serves both the JSON API (`/api/*`) and the dashboard from one
-process on port 3000.
+The app serves the dashboard and a bearer-token JSON API (`/api/*`) from
+one process on port 3000.
+
+## Logging wear from your phone
+
+Open `http://<host>:3000/log` in Safari and **Add to Home Screen**. The
+installed app opens straight to the wear log: current on-wrist state, one-tap
+put-on / swap / take-off, backfill, and inline corrections. That's the whole
+workflow — no companion app or shortcut needed.
 
 ## Exposing it (cloudflared)
 
 Point your existing cloudflared tunnel at `localhost:3000`. This is a
-**later** step, not required to use the app — on your home LAN, the
-`AUTH_TOKEN` bearer token alone is enough to protect `/api/*`, and the
-dashboard has no auth of its own until you add Cloudflare Access.
+**later** step, not required to use the app — on your home LAN the app works
+as-is (the dashboard is unauthenticated on the LAN; the API is protected by
+the bearer token). When you add the tunnel, put Cloudflare Access in front of
+every route. The `/api/*` surface is only used by scripts/automation you
+write yourself; if you have none, no Access bypass is needed at all.
 
-Once you do add the tunnel, protect every dashboard route (i.e. every path
-that isn't `/api/*`) with Cloudflare Access — `/api/*` stays open to bearer
-token only, since that's what the iOS Shortcut speaks and Access can't
-easily front a Shortcuts HTTP request.
+Remember to update `ORIGIN` in `.env` to the tunnel hostname when you switch.
 
-## Logging wear from your phone
+## The JSON API (optional)
 
-See [`docs/shortcut.md`](docs/shortcut.md) for the full step-by-step guide
-to building the iOS Shortcut that talks to `/api/*` (put on, swap, take
-off, backfill).
+`/api/*` (state, put-on, swap, take-off, backfill, stats) is bearer-token
+protected and exists for automation. One historical client is documented in
+[`docs/shortcut.md`](docs/shortcut.md) — a step-by-step iOS Shortcut build —
+kept for reference; the PWA replaced it as the primary logger.
 
 ## Development
 
