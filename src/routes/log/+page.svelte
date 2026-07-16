@@ -28,6 +28,22 @@
 
 	// most recent closed session (sessions arrive newest-first)
 	const lastOff = $derived(data.sessions.find((s) => s.endedAt !== null));
+
+	// Notes live behind a pencil icon + <dialog> so the logger stays compact;
+	// the textarea sits inside its action's <form>, so the value submits
+	// normally. Pencil shows an active state while a note is pending.
+	let notes = $state({ putOn: '', swap: '', takeOff: '' });
+	let noteDialogs: Partial<Record<keyof typeof notes, HTMLDialogElement>> = {};
+
+	const clearNotes = () => {
+		notes.putOn = notes.swap = notes.takeOff = '';
+	};
+	// after a successful action, reset pending notes along with the form
+	const submitAndClear = () =>
+		async ({ update }: { update: () => Promise<void> }) => {
+			await update();
+			clearNotes();
+		};
 </script>
 
 <svelte:head>
@@ -60,53 +76,99 @@
 	<p class="toast" role="alert">{form.message}</p>
 {/if}
 
-<section class="actions">
+<section class="logger card">
 	{#if data.state.valid_actions.includes('put_on')}
-		<form method="POST" action="?/putOn" use:enhance class="card action-form">
-			<h2>Put on</h2>
-			<label class="field">
-				<span class="lbl">Watch</span>
-				<select name="watch_id" required>
-					{#each data.state.watches as w (w.id)}
-						<option value={w.id}>{w.label}</option>
-					{/each}
-				</select>
-			</label>
-			<label class="field">
-				<span class="lbl">Note</span>
-				<input type="text" name="note" placeholder="optional" />
-			</label>
-			<button type="submit" class="primary big">Put On</button>
+		<form method="POST" action="?/putOn" use:enhance={submitAndClear} class="action-row">
+			<select name="watch_id" required aria-label="Watch to put on">
+				{#each data.state.watches as w (w.id)}
+					<option value={w.id}>{w.label}</option>
+				{/each}
+			</select>
+			<button type="submit" class="primary">Put On</button>
+			<button
+				type="button"
+				class="note-btn"
+				class:pending={notes.putOn.length > 0}
+				title="Add a note"
+				aria-label="Add a note"
+				onclick={() => noteDialogs.putOn?.showModal()}
+			>
+				&#9998;
+			</button>
+			<dialog bind:this={noteDialogs.putOn} closedby="any">
+				<p class="dialog-kicker">Note — put on</p>
+				<textarea name="note" rows="3" placeholder="optional" bind:value={notes.putOn}></textarea>
+				<div class="dialog-actions">
+					<button type="button" onclick={() => { notes.putOn = ''; noteDialogs.putOn?.close(); }}>
+						Clear
+					</button>
+					<button type="button" class="primary" onclick={() => noteDialogs.putOn?.close()}>
+						Done
+					</button>
+				</div>
+			</dialog>
 		</form>
 	{/if}
 
 	{#if data.state.valid_actions.includes('swap')}
-		<form method="POST" action="?/swap" use:enhance class="card action-form">
-			<h2>Swap</h2>
-			<label class="field">
-				<span class="lbl">New watch</span>
-				<select name="watch_id" required>
-					{#each data.state.watches as w (w.id)}
-						<option value={w.id}>{w.label}</option>
-					{/each}
-				</select>
-			</label>
-			<label class="field">
-				<span class="lbl">Note</span>
-				<input type="text" name="note" placeholder="optional" />
-			</label>
-			<button type="submit" class="primary big">Swap</button>
+		<form method="POST" action="?/swap" use:enhance={submitAndClear} class="action-row">
+			<select name="watch_id" required aria-label="Watch to swap to">
+				{#each data.state.watches as w (w.id)}
+					<option value={w.id}>{w.label}</option>
+				{/each}
+			</select>
+			<button type="submit" class="primary">Swap</button>
+			<button
+				type="button"
+				class="note-btn"
+				class:pending={notes.swap.length > 0}
+				title="Add a note"
+				aria-label="Add a note"
+				onclick={() => noteDialogs.swap?.showModal()}
+			>
+				&#9998;
+			</button>
+			<dialog bind:this={noteDialogs.swap} closedby="any">
+				<p class="dialog-kicker">Note — swap</p>
+				<textarea name="note" rows="3" placeholder="optional" bind:value={notes.swap}></textarea>
+				<div class="dialog-actions">
+					<button type="button" onclick={() => { notes.swap = ''; noteDialogs.swap?.close(); }}>
+						Clear
+					</button>
+					<button type="button" class="primary" onclick={() => noteDialogs.swap?.close()}>
+						Done
+					</button>
+				</div>
+			</dialog>
 		</form>
 	{/if}
 
 	{#if data.state.valid_actions.includes('take_off')}
-		<form method="POST" action="?/takeOff" use:enhance class="card action-form">
-			<h2>Take off</h2>
-			<label class="field">
-				<span class="lbl">Note</span>
-				<input type="text" name="note" placeholder="optional" />
-			</label>
-			<button type="submit" class="primary big">Take Off</button>
+		<hr class="row-divider" />
+		<form method="POST" action="?/takeOff" use:enhance={submitAndClear} class="action-row">
+			<button type="submit" class="primary off">Take Off</button>
+			<button
+				type="button"
+				class="note-btn"
+				class:pending={notes.takeOff.length > 0}
+				title="Add a note"
+				aria-label="Add a note"
+				onclick={() => noteDialogs.takeOff?.showModal()}
+			>
+				&#9998;
+			</button>
+			<dialog bind:this={noteDialogs.takeOff} closedby="any">
+				<p class="dialog-kicker">Note — take off</p>
+				<textarea name="note" rows="3" placeholder="optional" bind:value={notes.takeOff}></textarea>
+				<div class="dialog-actions">
+					<button type="button" onclick={() => { notes.takeOff = ''; noteDialogs.takeOff?.close(); }}>
+						Clear
+					</button>
+					<button type="button" class="primary" onclick={() => noteDialogs.takeOff?.close()}>
+						Done
+					</button>
+				</div>
+			</dialog>
 		</form>
 	{/if}
 </section>
@@ -201,31 +263,81 @@
 		margin: 0 0 1rem;
 		font-weight: 600;
 	}
-	.actions {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 0.75rem;
-		margin-bottom: 1rem;
-	}
-
-	@media (min-width: 44rem) {
-		.actions {
-			grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-			align-items: start;
-		}
-	}
-	.action-form {
+	.logger {
 		display: flex;
 		flex-direction: column;
 		gap: 0.6rem;
+		margin-bottom: 0.75rem;
+		max-width: 34rem;
+		margin-inline: auto;
+		padding: 0.75rem;
 	}
-	.action-form h2 {
-		margin: 0;
+	.action-row {
+		display: flex;
+		gap: 0.5rem;
+		align-items: stretch;
 	}
-	button.big {
+	.action-row select {
+		flex: 1 1 8rem;
+		min-width: 0;
+		color: var(--fg);
+	}
+	.action-row button.primary {
+		flex: 0 0 auto;
+	}
+	.action-row button.off {
+		flex: 1 1 auto;
+	}
+	.row-divider {
+		margin: 0.1rem 0;
+		border: none;
+		border-top: 1px solid var(--border);
+	}
+	.note-btn {
+		flex: 0 0 2.5rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1rem;
+		color: var(--fg-muted);
+		padding: 0;
+	}
+	.note-btn.pending {
+		color: var(--accent-fg);
+		background: var(--accent);
+		border-color: var(--accent);
+	}
+	dialog {
+		background: var(--bg-raised);
+		color: var(--fg);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow);
+		padding: 1rem;
+		width: min(22rem, calc(100vw - 2rem));
+	}
+	dialog::backdrop {
+		background: rgba(0, 0, 0, 0.35);
+	}
+	.dialog-kicker {
+		font-family: var(--font-display);
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--fg-muted);
+		margin: 0 0 0.6rem;
+	}
+	dialog textarea {
 		width: 100%;
-		padding: 0.85rem 1rem;
-		font-size: 1.05rem;
+		color: var(--fg);
+		resize: vertical;
+	}
+	.dialog-actions {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin-top: 0.75rem;
 	}
 	.backfill {
 		margin-bottom: 1.5rem;
