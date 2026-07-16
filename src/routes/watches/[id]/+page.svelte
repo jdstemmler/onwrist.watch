@@ -63,10 +63,6 @@
 			: `${fmtDay(s.endedAt)} · ${fmtTime(s.endedAt)}`;
 		return `${start} – ${end}`;
 	}
-
-	const initials = $derived(
-		(data.watch.brand[0] ?? '') + (data.watch.model[0] ?? '')
-	);
 </script>
 
 <svelte:head>
@@ -91,6 +87,7 @@
 		<a class="button" href="/watches/{data.watch.id}/edit">Edit</a>
 	</header>
 
+	{#if sortedPhotos.length}
 	<section class="photos">
 		{#if primaryPhoto}
 			<div class="primary-photo">
@@ -105,12 +102,9 @@
 					{/each}
 				</div>
 			{/if}
-		{:else}
-			<div class="primary-photo placeholder" aria-hidden="true">
-				<span>{initials}</span>
-			</div>
 		{/if}
 	</section>
+	{/if}
 
 	<section class="stat-row">
 		<div class="stat card">
@@ -318,17 +312,7 @@
 		display: block;
 	}
 
-	.primary-photo.placeholder {
-		display: grid;
-		place-items: center;
-	}
 
-	.primary-photo.placeholder span {
-		font-family: var(--font-display);
-		font-size: 3rem;
-		letter-spacing: 0.05em;
-		color: var(--fg-muted);
-	}
 
 	.thumb-row {
 		display: flex;

@@ -6,6 +6,10 @@
 	let { watch, photos }: { watch?: Watch; photos?: WatchPhoto[] } = $props();
 
 	const editing = $derived(watch != null);
+	let isGift = $state(false);
+	$effect(() => {
+		isGift = watch?.isGift ?? false;
+	});
 	const centsToDollars = (cents: number | null | undefined) =>
 		cents == null ? '' : (cents / 100).toFixed(2);
 	const message = $derived(page.form?.message as string | undefined);
@@ -45,6 +49,9 @@
 			<label class="field"><span class="lbl">Reference no.</span>
 				<input name="referenceNo" value={watch?.referenceNo ?? ''} />
 			</label>
+			<label class="field"><span class="lbl">Serial no.</span>
+				<input name="serialNo" value={watch?.serialNo ?? ''} />
+			</label>
 			<label class="field"><span class="lbl">Dial color</span>
 				<input name="dialColor" value={watch?.dialColor ?? ''} />
 			</label>
@@ -74,10 +81,14 @@
 	<fieldset>
 		<legend>Purchase</legend>
 		<div class="fields">
-			<label class="field"><span class="lbl">Purchase date</span>
+			<label class="check">
+				<input type="checkbox" name="isGift" bind:checked={isGift} />
+				<span>This was a gift</span>
+			</label>
+			<label class="field"><span class="lbl">{isGift ? 'Received date' : 'Purchase date'}</span>
 				<input name="purchaseDate" type="date" value={watch?.purchaseDate ?? ''} />
 			</label>
-			<label class="field"><span class="lbl">Price paid ($)</span>
+			<label class="field"><span class="lbl">{isGift ? 'Est. value ($) — not counted in $/wear' : 'Price paid ($)'}</span>
 				<input name="pricePaid" type="number" step="0.01" min="0" value={centsToDollars(watch?.pricePaidCents)} />
 			</label>
 			<label class="field"><span class="lbl">Purchased from</span>
@@ -93,6 +104,9 @@
 			</label>
 			<label class="field"><span class="lbl">Condition</span>
 				<input name="condition" value={watch?.condition ?? ''} placeholder="e.g. excellent" />
+			</label>
+			<label class="field"><span class="lbl">Last serviced</span>
+				<input name="lastServiced" type="date" value={watch?.lastServiced ?? ''} />
 			</label>
 		</div>
 	</fieldset>
@@ -238,6 +252,22 @@
 
 	label.wide {
 		grid-column: 1 / -1;
+	}
+
+	.check {
+		grid-column: 1 / -1;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.85rem;
+		color: var(--fg-muted);
+	}
+
+	.check input {
+		min-height: 0;
+		width: 1.05rem;
+		height: 1.05rem;
+		accent-color: var(--accent);
 	}
 
 	textarea {

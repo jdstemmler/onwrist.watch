@@ -13,9 +13,30 @@ describe('watchFormSchema', () => {
 			status: 'owned', soldDate: '', soldPrice: '', notes: ''
 		});
 		expect(d.pricePaidCents).toBe(500000);
+		expect(d.isGift).toBe(false); // checkbox absent -> false
+		expect(d.serialNo).toBeNull(); // absent -> null
+		expect(d.lastServiced).toBeNull();
 		expect(d.referenceNo).toBeNull();
 		expect(d.caseMm).toBe(42);
 		expect(d.soldPriceCents).toBeNull();
+	});
+});
+
+describe('watchFormSchema gift checkbox', () => {
+	it("coerces the checkbox's 'on' to true", () => {
+		const d = watchFormSchema.parse({ brand: 'Timex', model: 'Snoopy', isGift: 'on' });
+		expect(d.isGift).toBe(true);
+	});
+
+	it('passes serial and last-serviced through, empty -> null', () => {
+		const d = watchFormSchema.parse({
+			brand: 'Tudor', model: 'BB GMT', serialNo: 'J8992xxx', lastServiced: '2026-01-10'
+		});
+		expect(d.serialNo).toBe('J8992xxx');
+		expect(d.lastServiced).toBe('2026-01-10');
+		const e = watchFormSchema.parse({ brand: 'T', model: 'M', serialNo: '', lastServiced: '' });
+		expect(e.serialNo).toBeNull();
+		expect(e.lastServiced).toBeNull();
 	});
 });
 

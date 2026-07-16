@@ -14,6 +14,7 @@ export const watches = sqliteTable('watches', {
 	brand: text('brand').notNull(),
 	model: text('model').notNull(),
 	referenceNo: text('reference_no'),
+	serialNo: text('serial_no'),
 	nickname: text('nickname'),
 	dialColor: text('dial_color'),
 	movement: text('movement', { enum: ['automatic', 'manual', 'quartz', 'solar', 'other'] }),
@@ -21,11 +22,13 @@ export const watches = sqliteTable('watches', {
 	lugMm: real('lug_mm'),
 	waterResistanceM: integer('water_resistance_m'),
 	strapNotes: text('strap_notes'),
-	purchaseDate: text('purchase_date'), // ISO date, e.g. 2024-11-02
+	purchaseDate: text('purchase_date'), // ISO date, e.g. 2024-11-02 (received date for gifts)
 	pricePaidCents: integer('price_paid_cents'),
+	isGift: integer('is_gift', { mode: 'boolean' }).notNull().default(false),
 	purchasedFrom: text('purchased_from'),
 	boxPapers: text('box_papers', { enum: ['none', 'box', 'papers', 'both'] }),
 	condition: text('condition'),
+	lastServiced: text('last_serviced'), // ISO date
 	status: text('status', { enum: ['owned', 'sold'] }).notNull().default('owned'),
 	soldDate: text('sold_date'),
 	soldPriceCents: integer('sold_price_cents'),

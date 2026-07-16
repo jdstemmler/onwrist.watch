@@ -52,6 +52,18 @@ describe('statsByWatch', () => {
 	});
 });
 
+describe('statsByWatch gifts', () => {
+	it('a gift never gets a cost-per-wear, even with a recorded value', () => {
+		const gifted = db.insert(watches)
+			.values({ brand: 'Timex', model: 'Snoopy Chrono', pricePaidCents: 12000, isGift: true })
+			.returning().get().id;
+		createSession(db, { watchId: gifted, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		const s = statsByWatch(db, TZ, NOW).find((x) => x.watchId === gifted)!;
+		expect(s.wears).toBe(1);
+		expect(s.costPerWearCents).toBeNull();
+	});
+});
+
 describe('statsByDow / statsByTod / statsCalendar / statsSummary', () => {
 	beforeEach(() => {
 		// Monday July 13: Speedy 7 AM - 3 PM PDT (14:00-22:00Z)

@@ -55,7 +55,9 @@ export function statsByWatch(db: DB, tz: string, now: Date): WatchStats[] {
 			hours: minutes / 60,
 			lastWornAt,
 			costPerWearCents:
-				w.pricePaidCents != null && days.size > 0 ? Math.round(w.pricePaidCents / days.size) : null
+				w.pricePaidCents != null && days.size > 0 && !w.isGift
+					? Math.round(w.pricePaidCents / days.size)
+					: null
 		};
 	});
 }
