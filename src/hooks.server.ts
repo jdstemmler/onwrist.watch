@@ -8,7 +8,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (routeClass(pathname) === 'public') return resolve(event);
 
 	const token = event.cookies.get(SESSION_COOKIE) ?? '';
-	if (!token || !validateSession(getDb(), token, config.sessionDays)) {
+	const ok = token && (await validateSession(await getDb(), token, config.sessionDays));
+	if (!ok) {
 		const next = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname + search)}`;
 		redirect(303, `/login${next}`);
 	}

@@ -8,29 +8,29 @@ import { statsByWatch, statsByDow } from '$lib/server/stats';
 import { photoUrl } from '$lib/server/photos';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const db = getDb();
+	const db = await getDb();
 	const id = Number(params.id);
-	const watch = db.select().from(watches).where(eq(watches.id, id)).get();
+	const watch = (await db.select().from(watches).where(eq(watches.id, id)).limit(1))[0];
 	if (!watch) error(404, 'No such watch');
 	const now = new Date();
-	return {
-		watch,
-		// photoUrl() is server-only (path under $lib/server), so the URL is
-		// resolved here — the page component only ever sees plain strings.
-		photos: db
-			.select()
-			.from(watchPhotos)
-			.where(eq(watchPhotos.watchId, id))
-			.all()
-			.map((p) => ({ ...p, url: photoUrl(p.filePath) })),
-		stats: statsByWatch(db, config.homeTz, now).find((s) => s.watchId === id)!,
-		dow: statsByDow(db, config.homeTz, now).filter((r) => r.watchId === id),
-		sessions: db
+	const [photos, statsRows, dowRows, sessions] = await Promise.all([
+		db.select().from(watchPhotos).where(eq(watchPhotos.watchId, id)),
+		statsByWatch(db, config.homeTz, now),
+		statsByDow(db, config.homeTz, now),
+		db
 			.select()
 			.from(wearSessions)
 			.where(eq(wearSessions.watchId, id))
 			.orderBy(desc(wearSessions.startedAt))
 			.limit(20)
-			.all()
+	]);
+	return {
+		watch,
+		// photoUrl() is server-only (path under $lib/server), so the URL is
+		// resolved here — the page component only ever sees plain strings.
+		photos: photos.map((p) => ({ ...p, url: photoUrl(p.filePath) })),
+		stats: statsRows.find((s) => s.watchId === id)!,
+		dow: dowRows.filter((r) => r.watchId === id),
+		sessions
 	};
 };

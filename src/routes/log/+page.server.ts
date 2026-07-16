@@ -28,20 +28,20 @@ const EMPTY_WRIST_QUIPS = [
 ];
 
 export const load: PageServerLoad = async () => {
-	const db = getDb();
-	const state = getState(db, config.homeTz);
+	const db = await getDb();
+	const state = await getState(db, config.homeTz);
 	const quip = EMPTY_WRIST_QUIPS[Math.floor(Math.random() * EMPTY_WRIST_QUIPS.length)].replace(
 		'{n}',
 		String(state.watches.length)
 	);
-	const sessions = db
-		.select({ session: wearSessions, watch: watches })
-		.from(wearSessions)
-		.innerJoin(watches, eq(wearSessions.watchId, watches.id))
-		.orderBy(desc(wearSessions.startedAt))
-		.limit(100)
-		.all()
-		.map(({ session, watch }) => ({
+	const sessions = (
+		await db
+			.select({ session: wearSessions, watch: watches })
+			.from(wearSessions)
+			.innerJoin(watches, eq(wearSessions.watchId, watches.id))
+			.orderBy(desc(wearSessions.startedAt))
+			.limit(100)
+	).map(({ session, watch }) => ({
 			...session,
 			label: watchLabel(watch),
 			startedLocal: toLocalInput(session.startedAt, config.homeTz),
@@ -62,7 +62,7 @@ export const actions: Actions = {
 	putOn: async ({ request }) => {
 		const f = await request.formData();
 		try {
-			putOn(getDb(), {
+			await putOn(await getDb(), {
 				watchId: Number(f.get('watch_id')),
 				note: (f.get('note') as string) || undefined,
 				source: 'web'
@@ -72,7 +72,7 @@ export const actions: Actions = {
 	swap: async ({ request }) => {
 		const f = await request.formData();
 		try {
-			swap(getDb(), {
+			await swap(await getDb(), {
 				watchId: Number(f.get('watch_id')),
 				note: (f.get('note') as string) || undefined,
 				source: 'web'
@@ -82,13 +82,13 @@ export const actions: Actions = {
 	takeOff: async ({ request }) => {
 		const f = await request.formData();
 		try {
-			takeOff(getDb(), { note: (f.get('note') as string) || undefined, source: 'web' });
+			await takeOff(await getDb(), { note: (f.get('note') as string) || undefined, source: 'web' });
 		} catch (e) { return err(e); }
 	},
 	backfill: async ({ request }) => {
 		const f = await request.formData();
 		try {
-			createSession(getDb(), {
+			await createSession(await getDb(), {
 				watchId: Number(f.get('watch_id')),
 				startedAt: localInputToUtc(f.get('started_at') as string, config.homeTz),
 				endedAt: f.get('ended_at')
@@ -115,7 +115,7 @@ export const actions: Actions = {
 			const startedAtOrig = f.get('started_at_orig') as string;
 			const endedAtRaw = (f.get('ended_at') as string) ?? '';
 			const endedAtOrig = (f.get('ended_at_orig') as string) ?? '';
-			updateSession(getDb(), Number(f.get('id')), {
+			await updateSession(await getDb(), Number(f.get('id')), {
 				watchId: Number(f.get('watch_id')),
 				startedAt:
 					startedAtRaw === startedAtOrig
@@ -133,6 +133,6 @@ export const actions: Actions = {
 	},
 	delete: async ({ request }) => {
 		const f = await request.formData();
-		deleteSession(getDb(), Number(f.get('id')));
+		await deleteSession(await getDb(), Number(f.get('id')));
 	}
 };

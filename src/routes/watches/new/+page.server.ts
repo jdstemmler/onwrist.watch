@@ -9,8 +9,8 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const parsed = watchFormSchema.safeParse(Object.fromEntries(form));
 		if (!parsed.success) return fail(400, { message: 'Check the highlighted fields' });
-		const db = getDb();
-		const w = createWatch(db, parsed.data);
+		const db = await getDb();
+		const w = await createWatch(db, parsed.data);
 		const photo = form.get('photo');
 		if (photo instanceof File && photo.size > 0) await savePhoto(db, w.id, photo);
 		redirect(303, `/watches/${w.id}`);

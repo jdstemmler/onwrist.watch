@@ -7,14 +7,18 @@ export class StateError extends Error {
 }
 
 // Sentinel "end of time" so open sessions participate in overlap math.
-const FOREVER = new Date(8640000000000000);
+// Bounded to a 4-digit year: Postgres timestamptz accepts far larger years,
+// but the wire-protocol extended-year format (e.g. "+275760-09-13...", what
+// JS's actual Date max serializes to) isn't parseable by the pg driver here.
+const FOREVER = new Date('9999-12-31T23:59:59.999Z');
 
 export function watchLabel(w: { nickname: string | null; brand: string; model: string }): string {
 	return w.nickname ?? `${w.brand} ${w.model}`;
 }
 
-export function getOpenSession(db: DB): WearSession | null {
-	return db.select().from(wearSessions).where(isNull(wearSessions.endedAt)).get() ?? null;
+export async function getOpenSession(db: DB): Promise<WearSession | null> {
+	const rows = await db.select().from(wearSessions).where(isNull(wearSessions.endedAt)).limit(1);
+	return rows[0] ?? null;
 }
 
 function assertRange(startedAt: Date, endedAt: Date | null) {
@@ -22,121 +26,127 @@ function assertRange(startedAt: Date, endedAt: Date | null) {
 		throw new StateError('End time must be after start time');
 }
 
-function assertNoOverlap(db: DB, startedAt: Date, endedAt: Date | null, excludeId?: number) {
+async function assertNoOverlap(db: DB, startedAt: Date, endedAt: Date | null, excludeId?: number) {
 	const end = endedAt ?? FOREVER;
-	const clash = db
-		.select({ id: wearSessions.id })
-		.from(wearSessions)
-		.where(
-			and(
-				excludeId === undefined ? undefined : ne(wearSessions.id, excludeId),
-				lt(wearSessions.startedAt, end),
-				or(isNull(wearSessions.endedAt), gt(wearSessions.endedAt, startedAt))
+	const clash = (
+		await db
+			.select({ id: wearSessions.id })
+			.from(wearSessions)
+			.where(
+				and(
+					excludeId === undefined ? undefined : ne(wearSessions.id, excludeId),
+					lt(wearSessions.startedAt, end),
+					or(isNull(wearSessions.endedAt), gt(wearSessions.endedAt, startedAt))
+				)
 			)
-		)
-		.get();
+			.limit(1)
+	)[0];
 	if (clash) throw new StateError('Overlaps an existing wear session');
 }
 
 type Source = 'shortcut' | 'web' | 'backfill';
 
-export function putOn(
+export async function putOn(
 	db: DB,
 	opts: { watchId: number; note?: string; at?: Date; source?: Source }
-): WearSession {
+): Promise<WearSession> {
 	const at = opts.at ?? new Date();
-	if (getOpenSession(db)) throw new StateError('Already wearing a watch — swap or take it off first');
-	assertNoOverlap(db, at, null);
-	return db
-		.insert(wearSessions)
-		.values({
-			watchId: opts.watchId,
-			startedAt: at,
-			endedAt: null,
-			note: opts.note ?? null,
-			source: opts.source ?? 'shortcut'
-		})
-		.returning()
-		.get();
+	if (await getOpenSession(db)) throw new StateError('Already wearing a watch — swap or take it off first');
+	await assertNoOverlap(db, at, null);
+	return (
+		await db
+			.insert(wearSessions)
+			.values({
+				watchId: opts.watchId,
+				startedAt: at,
+				endedAt: null,
+				note: opts.note ?? null,
+				source: opts.source ?? 'shortcut'
+			})
+			.returning()
+	)[0];
 }
 
-export function takeOff(
+export async function takeOff(
 	db: DB,
 	opts: { note?: string; at?: Date; source?: Source } = {}
-): WearSession {
-	const open = getOpenSession(db);
+): Promise<WearSession> {
+	const open = await getOpenSession(db);
 	if (!open) throw new StateError('No watch on right now');
 	const at = opts.at ?? new Date();
 	assertRange(open.startedAt, at);
 	const note = opts.note ? (open.note ? `${open.note}\n${opts.note}` : opts.note) : open.note;
-	return db
-		.update(wearSessions)
-		.set({ endedAt: at, note, updatedAt: new Date() })
-		.where(eq(wearSessions.id, open.id))
-		.returning()
-		.get();
+	return (
+		await db
+			.update(wearSessions)
+			.set({ endedAt: at, note, updatedAt: new Date() })
+			.where(eq(wearSessions.id, open.id))
+			.returning()
+	)[0];
 }
 
-export function swap(
+export async function swap(
 	db: DB,
 	opts: { watchId: number; note?: string; at?: Date; source?: Source }
-): { closed: WearSession; opened: WearSession } {
-	const open = getOpenSession(db);
+): Promise<{ closed: WearSession; opened: WearSession }> {
+	const open = await getOpenSession(db);
 	if (!open) throw new StateError('No watch on — use put-on instead');
 	if (open.watchId === opts.watchId) throw new StateError('Already wearing that watch');
 	const at = opts.at ?? new Date();
-	return db.transaction((tx) => {
-		const closed = takeOff(tx as unknown as DB, { at, source: opts.source });
-		const opened = putOn(tx as unknown as DB, { ...opts, at });
+	return await db.transaction(async (tx) => {
+		const closed = await takeOff(tx, { at, source: opts.source });
+		const opened = await putOn(tx, { ...opts, at });
 		return { closed, opened };
 	});
 }
 
-export function createSession(
+export async function createSession(
 	db: DB,
 	opts: { watchId: number; startedAt: Date; endedAt?: Date | null; note?: string; source?: Source }
-): WearSession {
+): Promise<WearSession> {
 	const endedAt = opts.endedAt ?? null;
 	assertRange(opts.startedAt, endedAt);
-	assertNoOverlap(db, opts.startedAt, endedAt);
-	return db
-		.insert(wearSessions)
-		.values({
-			watchId: opts.watchId,
-			startedAt: opts.startedAt,
-			endedAt,
-			note: opts.note ?? null,
-			source: opts.source ?? 'backfill'
-		})
-		.returning()
-		.get();
+	await assertNoOverlap(db, opts.startedAt, endedAt);
+	return (
+		await db
+			.insert(wearSessions)
+			.values({
+				watchId: opts.watchId,
+				startedAt: opts.startedAt,
+				endedAt,
+				note: opts.note ?? null,
+				source: opts.source ?? 'backfill'
+			})
+			.returning()
+	)[0];
 }
 
-export function updateSession(
+export async function updateSession(
 	db: DB,
 	id: number,
 	patch: { startedAt?: Date; endedAt?: Date | null; note?: string | null; watchId?: number }
-): WearSession {
-	const existing = db.select().from(wearSessions).where(eq(wearSessions.id, id)).get();
+): Promise<WearSession> {
+	const existing = (await db.select().from(wearSessions).where(eq(wearSessions.id, id)).limit(1))[0];
 	if (!existing) throw new StateError('Session not found');
 	const startedAt = patch.startedAt ?? existing.startedAt;
 	const endedAt = patch.endedAt === undefined ? existing.endedAt : patch.endedAt;
 	assertRange(startedAt, endedAt);
-	assertNoOverlap(db, startedAt, endedAt, id);
-	return db
-		.update(wearSessions)
-		.set({
-			startedAt,
-			endedAt,
-			note: patch.note === undefined ? existing.note : patch.note,
-			watchId: patch.watchId ?? existing.watchId,
-			updatedAt: new Date()
-		})
-		.where(eq(wearSessions.id, id))
-		.returning()
-		.get();
+	await assertNoOverlap(db, startedAt, endedAt, id);
+	return (
+		await db
+			.update(wearSessions)
+			.set({
+				startedAt,
+				endedAt,
+				note: patch.note === undefined ? existing.note : patch.note,
+				watchId: patch.watchId ?? existing.watchId,
+				updatedAt: new Date()
+			})
+			.where(eq(wearSessions.id, id))
+			.returning()
+	)[0];
 }
 
-export function deleteSession(db: DB, id: number): void {
-	db.delete(wearSessions).where(eq(wearSessions.id, id)).run();
+export async function deleteSession(db: DB, id: number): Promise<void> {
+	await db.delete(wearSessions).where(eq(wearSessions.id, id));
 }

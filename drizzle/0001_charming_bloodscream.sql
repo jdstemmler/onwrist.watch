@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "one_open_session_per_watch" ON "wear_sessions" USING btree ("watch_id") WHERE "wear_sessions"."ended_at" IS NULL;

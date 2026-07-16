@@ -1,13 +1,18 @@
-import path from 'node:path';
-import { createDb, resolveDbFile } from '../src/lib/server/db';
+import { Pool } from 'pg';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { createDb } from '../src/lib/server/db';
 import { watches } from '../src/lib/server/db/schema';
 import { createSession, putOn } from '../src/lib/server/sessions';
 
-const DATA_DIR = process.env.DATA_DIR ?? './data';
-const db = createDb(resolveDbFile(DATA_DIR));
+const pool = new Pool({
+	connectionString: process.env.DATABASE_URL ?? 'postgres://onwrist:scratch@localhost:55432/onwrist'
+});
+const db = createDb(pool);
+await migrate(db, { migrationsFolder: 'drizzle' });
 
-if (db.select().from(watches).all().length > 0) {
-	console.error('Database is not empty — refusing to seed. Delete the db file to reseed.');
+if ((await db.select().from(watches)).length > 0) {
+	console.error('Database is not empty — refusing to seed. Reset the scratch DB to reseed.');
+	await pool.end();
 	process.exit(1);
 }
 
@@ -38,9 +43,10 @@ const COLLECTION = [
 	{ brand: 'Apple', model: 'Watch Ultra 2', nickname: 'Gym watch', dialColor: 'digital', movement: 'other', caseMm: 49, lugMm: 22, pricePaidCents: 79900, purchaseDate: '2024-10-01', boxPapers: 'box' }
 ] as const;
 
-const ids: number[] = COLLECTION.map((w) =>
-	db.insert(watches).values({ ...w }).returning().get().id
-);
+const ids: number[] = [];
+for (const w of COLLECTION) {
+	ids.push((await db.insert(watches).values({ ...w }).returning())[0].id);
+}
 
 // Favorites get worn more: weight by position (earlier = more worn).
 const weighted = ids.flatMap((id, i) => Array(Math.max(1, 8 - i)).fill(id));
@@ -67,18 +73,28 @@ for (let daysAgo = 120; daysAgo >= 1; daysAgo--) {
 		// midday swap: two back-to-back sessions
 		const mid = at(20, Math.floor(rand() * 60));
 		const end = at(29, Math.floor(rand() * 90)); // 9-10:30 PM Pacific
-		createSession(db, { watchId, startedAt: start, endedAt: mid, note });
-		createSession(db, { watchId: pick(weighted.filter((i) => i !== watchId)), startedAt: mid, endedAt: end });
+		await createSession(db, { watchId, startedAt: start, endedAt: mid, note });
+		await createSession(db, {
+			watchId: pick(weighted.filter((i) => i !== watchId)),
+			startedAt: mid,
+			endedAt: end
+		});
 	} else if (rand() < 0.04) {
 		// camping: worn overnight, off early next morning (before next day's ~6:30 AM start)
-		createSession(db, { watchId, startedAt: start, endedAt: at(37, 0), note: 'camping' });
+		await createSession(db, { watchId, startedAt: start, endedAt: at(37, 0), note: 'camping' });
 	} else {
-		createSession(db, { watchId, startedAt: start, endedAt: at(28, Math.floor(rand() * 150)), note });
+		await createSession(db, {
+			watchId,
+			startedAt: start,
+			endedAt: at(28, Math.floor(rand() * 150)),
+			note
+		});
 	}
 	sessions++;
 }
 
 // Currently wearing something (put on this morning).
-putOn(db, { watchId: ids[0], at: new Date(anchor.getTime() - 3 * 3_600_000), source: 'web' });
+await putOn(db, { watchId: ids[0], at: new Date(anchor.getTime() - 3 * 3_600_000), source: 'web' });
 
 console.log(`Seeded ${ids.length} watches and ~${sessions} wear days (one session still open).`);
+await pool.end();

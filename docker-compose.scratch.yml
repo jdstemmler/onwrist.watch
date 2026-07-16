@@ -1,0 +1,18 @@
+# Isolated verification stack for Plan A. NEVER use the default compose
+# project for Plan A work — production data lives there.
+services:
+  scratch-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: onwrist
+      POSTGRES_PASSWORD: scratch
+      POSTGRES_DB: onwrist
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onwrist"]
+      interval: 2s
+      timeout: 3s
+      retries: 15

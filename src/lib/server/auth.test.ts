@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createDb, type DB } from './db';
+import type { DB } from './db';
+import { createTestDb } from './db/test-utils';
 import { authSessions } from './db/schema';
 import {
 	verifyPassword,
@@ -18,8 +19,8 @@ const T0 = new Date('2026-07-16T00:00:00Z');
 const at = (days: number) => new Date(T0.getTime() + days * DAY);
 
 let db: DB;
-beforeEach(() => {
-	db = createDb(':memory:');
+beforeEach(async () => {
+	db = await createTestDb();
 	recordLoginSuccess(); // reset throttle state between tests
 });
 
@@ -37,51 +38,51 @@ describe('verifyPassword', () => {
 });
 
 describe('sessions', () => {
-	it('roundtrips: created token validates, garbage does not', () => {
-		const token = createSession(db, 30, T0);
+	it('roundtrips: created token validates, garbage does not', async () => {
+		const token = await createSession(db, 30, T0);
 		expect(token.length).toBeGreaterThanOrEqual(32);
-		expect(validateSession(db, token, 30, T0)).toBe(true);
-		expect(validateSession(db, 'not-a-token', 30, T0)).toBe(false);
-		expect(validateSession(db, '', 30, T0)).toBe(false);
+		expect(await validateSession(db, token, 30, T0)).toBe(true);
+		expect(await validateSession(db, 'not-a-token', 30, T0)).toBe(false);
+		expect(await validateSession(db, '', 30, T0)).toBe(false);
 	});
 
-	it('stores only a hash of the token', () => {
-		const token = createSession(db, 30, T0);
-		const rows = db.select().from(authSessions).all();
+	it('stores only a hash of the token', async () => {
+		const token = await createSession(db, 30, T0);
+		const rows = await db.select().from(authSessions);
 		expect(rows).toHaveLength(1);
 		expect(rows[0].tokenHash).not.toContain(token);
 	});
 
-	it('expires after the configured window when unused', () => {
-		const token = createSession(db, 30, T0);
-		expect(validateSession(db, token, 30, at(31))).toBe(false);
+	it('expires after the configured window when unused', async () => {
+		const token = await createSession(db, 30, T0);
+		expect(await validateSession(db, token, 30, at(31))).toBe(false);
 	});
 
-	it('a touch near the end of the window renews it (sliding)', () => {
-		const token = createSession(db, 30, T0);
-		expect(validateSession(db, token, 30, at(29))).toBe(true); // renews to day 59
-		expect(validateSession(db, token, 30, at(31))).toBe(true);
+	it('a touch near the end of the window renews it (sliding)', async () => {
+		const token = await createSession(db, 30, T0);
+		expect(await validateSession(db, token, 30, at(29))).toBe(true); // renews to day 59
+		expect(await validateSession(db, token, 30, at(31))).toBe(true);
 	});
 
-	it('slides expiry forward when past half-life', () => {
-		const token = createSession(db, 30, T0);
-		expect(validateSession(db, token, 30, at(20))).toBe(true); // renews here
-		expect(validateSession(db, token, 30, at(45))).toBe(true); // alive only if renewed
+	it('slides expiry forward when past half-life', async () => {
+		const token = await createSession(db, 30, T0);
+		expect(await validateSession(db, token, 30, at(20))).toBe(true); // renews here
+		expect(await validateSession(db, token, 30, at(45))).toBe(true); // alive only if renewed
 	});
 
-	it('revoke logs the token out immediately', () => {
-		const token = createSession(db, 30, T0);
-		revokeSession(db, token);
-		expect(validateSession(db, token, 30, T0)).toBe(false);
+	it('revoke logs the token out immediately', async () => {
+		const token = await createSession(db, 30, T0);
+		await revokeSession(db, token);
+		expect(await validateSession(db, token, 30, T0)).toBe(false);
 	});
 
-	it('prune removes only expired rows', () => {
-		const dead = createSession(db, 1, T0);
-		const alive = createSession(db, 30, T0);
-		pruneSessions(db, at(2));
-		expect(validateSession(db, alive, 30, at(2))).toBe(true);
-		expect(validateSession(db, dead, 30, at(2))).toBe(false);
-		expect(db.select().from(authSessions).all()).toHaveLength(1);
+	it('prune removes only expired rows', async () => {
+		const dead = await createSession(db, 1, T0);
+		const alive = await createSession(db, 30, T0);
+		await pruneSessions(db, at(2));
+		expect(await validateSession(db, alive, 30, at(2))).toBe(true);
+		expect(await validateSession(db, dead, 30, at(2))).toBe(false);
+		expect(await db.select().from(authSessions)).toHaveLength(1);
 	});
 });
 

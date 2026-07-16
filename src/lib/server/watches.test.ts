@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { createDb } from './db';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createTestDb } from './db/test-utils';
+import type { DB } from './db';
 import { watchFormSchema, createWatch, updateWatch } from './watches';
 
 describe('watchFormSchema', () => {
@@ -41,11 +42,16 @@ describe('watchFormSchema gift checkbox', () => {
 });
 
 describe('watch crud', () => {
-	it('creates and updates', () => {
-		const db = createDb(':memory:');
-		const w = createWatch(db, watchFormSchema.parse({ brand: 'Seiko', model: 'SKX007', status: 'owned' }));
+	let db: DB;
+
+	beforeEach(async () => {
+		db = await createTestDb();
+	});
+
+	it('creates and updates', async () => {
+		const w = await createWatch(db, watchFormSchema.parse({ brand: 'Seiko', model: 'SKX007', status: 'owned' }));
 		expect(w.id).toBe(1);
-		const u = updateWatch(db, w.id, watchFormSchema.parse({ brand: 'Seiko', model: 'SKX007', nickname: 'Beater', status: 'owned' }));
+		const u = await updateWatch(db, w.id, watchFormSchema.parse({ brand: 'Seiko', model: 'SKX007', nickname: 'Beater', status: 'owned' }));
 		expect(u.nickname).toBe('Beater');
 	});
 });

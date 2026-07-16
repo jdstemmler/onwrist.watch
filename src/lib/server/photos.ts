@@ -1,36 +1,52 @@
 import { eq } from 'drizzle-orm';
-import fs from 'node:fs';
-import path from 'node:path';
+import sharp from 'sharp';
 import type { DB } from './db';
 import { watchPhotos, type WatchPhoto } from './db/schema';
-import { config } from './config';
+import { getStorage, type PhotoStorage } from './storage';
+import { StateError } from './sessions';
 
 export function photoUrl(filePath: string): string {
 	return `/photos/${filePath}`;
 }
 
-export async function savePhoto(db: DB, watchId: number, file: File): Promise<WatchPhoto> {
-	const ext = path.extname(file.name).toLowerCase() || '.jpg';
-	const rel = path.join(String(watchId), `${crypto.randomUUID()}${ext}`);
-	const abs = path.join(config.dataDir, 'photos', rel);
-	fs.mkdirSync(path.dirname(abs), { recursive: true });
-	fs.writeFileSync(abs, Buffer.from(await file.arrayBuffer()));
-	const isFirst = !db.select().from(watchPhotos).where(eq(watchPhotos.watchId, watchId)).get();
-	return db.insert(watchPhotos)
-		.values({ watchId, filePath: rel, isPrimary: isFirst })
-		.returning().get();
+export async function savePhoto(
+	db: DB,
+	watchId: number,
+	file: File,
+	storage: PhotoStorage = getStorage()
+): Promise<WatchPhoto> {
+	if (!file.type.startsWith('image/')) {
+		throw new StateError(`Unsupported file type: ${file.type || 'unknown'}`);
+	}
+	const webp = await sharp(Buffer.from(await file.arrayBuffer()))
+		.rotate()
+		.resize(2000, 2000, { fit: 'inside', withoutEnlargement: true })
+		.webp({ quality: 80 })
+		.toBuffer();
+	const key = `${watchId}/${crypto.randomUUID()}.webp`;
+	await storage.put(key, webp);
+	const isFirst = !(
+		await db.select().from(watchPhotos).where(eq(watchPhotos.watchId, watchId)).limit(1)
+	)[0];
+	return (
+		await db.insert(watchPhotos).values({ watchId, filePath: key, isPrimary: isFirst }).returning()
+	)[0];
 }
 
-export function deletePhoto(db: DB, photoId: number): void {
-	const p = db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).get();
+export async function deletePhoto(
+	db: DB,
+	photoId: number,
+	storage: PhotoStorage = getStorage()
+): Promise<void> {
+	const p = (await db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).limit(1))[0];
 	if (!p) return;
-	fs.rmSync(path.join(config.dataDir, 'photos', p.filePath), { force: true });
-	db.delete(watchPhotos).where(eq(watchPhotos.id, photoId)).run();
+	await storage.delete(p.filePath);
+	await db.delete(watchPhotos).where(eq(watchPhotos.id, photoId));
 }
 
-export function setPrimaryPhoto(db: DB, photoId: number): void {
-	const p = db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).get();
+export async function setPrimaryPhoto(db: DB, photoId: number): Promise<void> {
+	const p = (await db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).limit(1))[0];
 	if (!p) return;
-	db.update(watchPhotos).set({ isPrimary: false }).where(eq(watchPhotos.watchId, p.watchId)).run();
-	db.update(watchPhotos).set({ isPrimary: true }).where(eq(watchPhotos.id, photoId)).run();
+	await db.update(watchPhotos).set({ isPrimary: false }).where(eq(watchPhotos.watchId, p.watchId));
+	await db.update(watchPhotos).set({ isPrimary: true }).where(eq(watchPhotos.id, photoId));
 }

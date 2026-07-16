@@ -22,7 +22,7 @@ function safeNext(raw: string | null): string {
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
 	const token = cookies.get(SESSION_COOKIE) ?? '';
-	if (token && validateSession(getDb(), token, config.sessionDays)) {
+	if (token && (await validateSession(await getDb(), token, config.sessionDays))) {
 		redirect(303, safeNext(url.searchParams.get('next')));
 	}
 	return { next: url.searchParams.get('next') ?? '/' };
@@ -42,9 +42,9 @@ export const actions: Actions = {
 			return fail(401, { message: 'Not it. Check again.' });
 		}
 		recordLoginSuccess();
-		const db = getDb();
-		pruneSessions(db); // housekeeping: clear expired rows on successful login
-		const token = createSession(db, config.sessionDays);
+		const db = await getDb();
+		await pruneSessions(db); // housekeeping: clear expired rows on successful login
+		const token = await createSession(db, config.sessionDays);
 		cookies.set(SESSION_COOKIE, token, {
 			path: '/',
 			httpOnly: true,
@@ -56,7 +56,7 @@ export const actions: Actions = {
 
 	logout: async ({ cookies }) => {
 		const token = cookies.get(SESSION_COOKIE);
-		if (token) revokeSession(getDb(), token);
+		if (token) await revokeSession(await getDb(), token);
 		cookies.delete(SESSION_COOKIE, { path: '/' });
 		redirect(303, '/login');
 	}

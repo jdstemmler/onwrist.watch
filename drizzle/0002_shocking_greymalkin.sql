@@ -1,1 +1,0 @@
-ALTER TABLE `watches` ADD `is_gift` integer DEFAULT false NOT NULL;
