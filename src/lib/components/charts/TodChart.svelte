@@ -65,7 +65,7 @@
 	</section>
 
 	<section>
-		<h3>Wearing share</h3>
+		<h3>Wearing share <span class="qualifier">— of tracked days</span></h3>
 		<svg viewBox="0 0 {PLOT_W + 40} {PLOT_H + 26}" role="img" aria-label="Share of days the watch was on the wrist, by hour of day">
 			<g transform="translate(30, 0)">
 				{#each shareTicks as t}
@@ -93,6 +93,12 @@
 		display: grid;
 		gap: 1.25rem;
 	}
+	.qualifier {
+		font-weight: 400;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
 	h3 {
 		font-family: var(--font-sans);
 		font-size: 0.8rem;

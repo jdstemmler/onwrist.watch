@@ -30,22 +30,26 @@
 
 	const PLOT_W = 700;
 	const PLOT_H = 160;
-	const x = (h: number) => (h / 23) * PLOT_W;
+	const CELL = PLOT_W / 24; // hour buckets are discrete: one flat cell each
+	const x = (h: number) => h * CELL;
 	const y = (v: number) => PLOT_H - (v / niceMax) * PLOT_H;
 
-	// cumulative bands: band[i] = area between stack-below and stack-including series i
+	// cumulative bands rendered as steps — each hour is a flat cell, so a
+	// single worn hour is a block, not an interpolated wedge
 	const bands = $derived.by(() => {
 		const cum = Array(24).fill(0);
+		const stepPoints = (vals: number[]) =>
+			vals.flatMap((v, h) => [
+				`${x(h).toFixed(1)},${y(v).toFixed(1)}`,
+				`${x(h + 1).toFixed(1)},${y(v).toFixed(1)}`
+			]);
 		return series.map(([id, label]) => {
 			const lower = [...cum];
 			const arr = grid.get(id)!;
 			for (let h = 0; h < 24; h++) cum[h] += arr[h];
 			const upper = [...cum];
-			const top = upper.map((v, h) => `${x(h).toFixed(1)},${y(v).toFixed(1)}`).join(' L');
-			const bottom = lower
-				.map((v, h) => `${x(h).toFixed(1)},${y(v).toFixed(1)}`)
-				.reverse()
-				.join(' L');
+			const top = stepPoints(upper).join(' L');
+			const bottom = stepPoints(lower).reverse().join(' L');
 			return { id, label, d: `M${top} L${bottom} Z` };
 		});
 	});
@@ -89,18 +93,12 @@
 					<path d={b.d} fill={slotVar(colorSlots.get(b.id) ?? 0)} class="band" />
 				{/each}
 				{#each Array.from({ length: 24 }, (_, h) => h) as h}
-					<rect
-						x={h === 0 ? 0 : x(h) - PLOT_W / 46}
-						y="0"
-						width={PLOT_W / 23}
-						height={PLOT_H}
-						class="hit"
-					>
+					<rect x={x(h)} y="0" width={CELL} height={PLOT_H} class="hit">
 						<title>{hourTitle(h)}</title>
 					</rect>
 				{/each}
 				{#each [...HOUR_LABELS] as [h, lbl]}
-					<text x={x(h)} y={PLOT_H + 16} class="xtick" text-anchor={h === 0 ? 'start' : h === 23 ? 'end' : 'middle'}>{lbl}</text>
+					<text x={x(h) + CELL / 2} y={PLOT_H + 16} class="xtick" text-anchor="middle">{lbl}</text>
 				{/each}
 				<line x1="0" x2={PLOT_W} y1={PLOT_H} y2={PLOT_H} class="baseline" />
 			</g>
