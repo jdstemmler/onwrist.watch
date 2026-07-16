@@ -15,7 +15,7 @@
 	let { byWatch, nowIso, colorSlots }: { byWatch: WatchStats[]; nowIso: string; colorSlots: Map<number, number> } =
 		$props();
 
-	const NEGLECT_DAYS = 30;
+	const NEGLECT_DAYS = 90;
 	const now = $derived(new Date(nowIso).getTime());
 
 	const owned = $derived(byWatch.filter((w) => w.status === 'owned'));
