@@ -1,12 +1,4 @@
 import argon2 from 'argon2';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-// Plain fs read (not Vite's `?raw` import) so this module loads the same way
-// under the app (Vite/vitest) and under plain `tsx` (e.g. scripts/seed.ts's
-// transitive import via createDb -> admin -> here).
-const list = readFileSync(fileURLToPath(new URL('./passwords-10k.txt', import.meta.url)), 'utf-8');
-const COMMON = new Set(list.split('\n').map((l) => l.trim()).filter(Boolean));
 
 export function emailKey(raw: string): string {
 	return raw.trim().toLowerCase();
@@ -22,12 +14,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function emailFormatError(email: string): string | null {
 	const trimmed = email.trim();
 	if (!trimmed || /\s/.test(trimmed) || !EMAIL_RE.test(trimmed)) return 'Enter a valid email';
-	return null;
-}
-
-export function passwordPolicyError(pw: string): string | null {
-	if (pw.length < 10) return 'Password must be at least 10 characters';
-	if (COMMON.has(pw)) return 'That password is too common — pick something less guessable';
 	return null;
 }
 

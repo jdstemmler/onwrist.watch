@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { emailKey, emailFormatError, passwordPolicyError, hashPassword, verifyPasswordHash } from './passwords';
+import { emailKey, emailFormatError, hashPassword, verifyPasswordHash } from './passwords';
 
 describe('emailKey', () => {
 	it('normalizes case and whitespace', () => {
@@ -31,18 +31,6 @@ describe('emailFormatError', () => {
 		['two @', 'jay@son@example.com']
 	])('rejects %s', (_label, input) => {
 		expect(emailFormatError(input)).toEqual(expect.any(String));
-	});
-});
-
-describe('password policy', () => {
-	it('rejects short passwords', () => {
-		expect(passwordPolicyError('short12')).toMatch(/10/);
-	});
-	it('control-1b: rejects top-10k common passwords', () => {
-		expect(passwordPolicyError('1234567890')).toMatch(/common/i);
-	});
-	it('accepts a long uncommon password with no composition rules', () => {
-		expect(passwordPolicyError('correct horse battery')).toBeNull();
 	});
 });
 

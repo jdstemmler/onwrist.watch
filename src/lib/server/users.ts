@@ -1,7 +1,8 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DB } from './db';
 import { users, emailTokens, type User } from './db/schema';
-import { emailKey, passwordPolicyError, hashPassword } from './passwords';
+import { emailKey, hashPassword } from './passwords';
+import { passwordPolicyError } from './password-policy';
 import { StateError } from './sessions';
 import { revokeAllSessions } from './auth';
 
