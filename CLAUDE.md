@@ -1,6 +1,6 @@
 # horolog
 
-Single-user, self-hosted watch-collection tracker: inventory + wear-session logging (installable PWA) + stats dashboard. Runs as a SvelteKit app + Postgres via docker compose on a homelab behind cloudflared.
+Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session logging (installable PWA) + stats dashboard, with self-serve accounts. Runs as a SvelteKit app + Postgres via docker compose on a homelab behind cloudflared.
 
 - **Design spec:** `docs/superpowers/specs/2026-07-14-horolog-design.md` — the source of truth for scope and behavior.
 - **Implementation plan:** `docs/superpowers/plans/2026-07-14-horolog.md` — task-by-task with complete code; includes the unattended-run Execution Directive. If you're implementing, work from your assigned task's interface contract.
@@ -13,7 +13,7 @@ Single-user, self-hosted watch-collection tracker: inventory + wear-session logg
 - `npm test` — Vitest suite against PGlite (must be green before any commit)
 - `npm run check` — svelte-check / typecheck
 - `npm run db:generate` — generate Drizzle migration after schema changes (unchanged in purpose: run after editing `src/lib/server/db/schema.ts`)
-- `npm run seed` — seed the scratch Postgres (12 watches + wear history; refuses non-empty DB)
+- `npm run seed` — seed the scratch Postgres (one verified user + 12 watches + wear history; refuses non-empty DB). Account emails (verify/reset/change) are logged to the console, not sent, whenever `RESEND_API_KEY` is unset — the default for the scratch stack.
 - `docker compose up --build` — production-shaped run on :3000 (production compose project — see guard below)
 
 ## Production guard
@@ -27,17 +27,18 @@ for the full production topology, backup, and restore procedures.
 
 ## Invariants (never violate; enforced in `src/lib/server/sessions.ts`)
 
-- Zero or one watch on-wrist: at most one `wear_sessions` row with `ended_at IS NULL`.
+- Zero or one watch on-wrist **per user**: at most one `wear_sessions` row with `ended_at IS NULL` among that user's watches. Mutations serialize behind a `SELECT … FOR UPDATE` lock on the user's `users` row (`lockUser()`), backstopped by a partial unique index (`one_open_session_per_watch … WHERE ended_at IS NULL`) at the DB level.
 - Sessions never overlap; `ended_at > started_at`. Touching boundaries are legal (swap produces them).
 - Every mutation path — actions, backfill, edits — revalidates these. Never write session rows around the domain layer.
 - The API never auto-closes sessions; stale open sessions only produce a dashboard nudge.
 
 ## Conventions
 
-- Domain functions live in `src/lib/server/` and are async, taking the DB handle as their first argument (tests use `await createTestDb()` from the PGlite harness in `src/lib/server/db/test-utils.ts`, not `createDb(':memory:')`).
-- Photo files are only ever touched via the `PhotoStorage` interface (`src/lib/server/storage/`, `put`/`get`/`delete`/`sizeOfPrefix`) — never read/write the photos directory directly outside that module.
+- Domain functions live in `src/lib/server/` and are async, taking the DB handle first and a `userId` second — every read and mutation is tenant-scoped (`sessions.ts`, `watches.ts`, `photos.ts`, `stats.ts`, `state.ts` all take `(db, userId, …)`; ownership is asserted, never assumed, e.g. `assertWatchOwned`). Tests use `await createTestDb()` from the PGlite harness in `src/lib/server/db/test-utils.ts`, not `createDb(':memory:')`.
+- Photo files are only ever touched via the `PhotoStorage` interface (`src/lib/server/storage/`, `put`/`get`/`delete`/`sizeOfPrefix`) — never read/write the photos directory directly outside that module. Keys are per-user prefixed (`${userId}/${watchId}/...`).
+- Quotas live in the domain functions, not the UI: 20 watches/user, 12 photos/watch, 1 GiB photo storage/user — each multipliable per-user via `users.quotaMultiplier`. Over-quota throws `StateError`.
 - State-machine violations throw `StateError` → 409 with a human-readable `message`, shown verbatim as a dashboard toast — write it for a phone-sized screen.
-- Timestamps stored UTC (Drizzle `timestamp(..., { withTimezone: true, mode: 'date' })`); all DOW/TOD/calendar bucketing uses `config.homeTz` via `src/lib/server/time.ts`. Money is integer cents.
-- Auth is a single-password session cookie (`DASH_PASSWORD` env; `src/lib/server/auth.ts`, gated in `hooks.server.ts`). There is no REST API — the retired shortcut-facing `/api/*` surface is recoverable from git history if ever needed. Dashboard mutations are SvelteKit form actions calling the domain functions — don't add parallel REST endpoints.
+- Timestamps stored UTC (Drizzle `timestamp(..., { withTimezone: true, mode: 'date' })`); all DOW/TOD/calendar bucketing uses the signed-in user's `homeTz` preference (`locals.user.homeTz`, edited on `/settings`) via `src/lib/server/time.ts` — not a global config value. Money is integer cents.
+- Auth is roll-your-own, per-user accounts, not a shared password: argon2id password hashing, SHA-256-hashed email/session tokens, a Postgres-backed fixed-window rate limiter, and Turnstile on signup (`src/lib/server/auth.ts`, `passwords.ts`, `flows.ts`, `rate-limit.ts`, `turnstile.ts`; session populated onto `event.locals.user` in `hooks.server.ts`). Unverified users can log in but mutating actions are gated by `requireVerified()`. There is no REST API — the retired shortcut-facing `/api/*` surface is recoverable from git history if ever needed. Dashboard mutations are SvelteKit form actions calling the domain functions — don't add parallel REST endpoints.
 - Watch display name: `watchLabel()` (nickname, else brand + model). Don't reimplement.
 - TDD for domain/stats/auth; UI is lightly tested and verified in the browser. Apply the frontend-design skill for UI work and the dataviz skill for charts.

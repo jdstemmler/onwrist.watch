@@ -1,10 +1,10 @@
 # horolog
 
-A single-user, self-hosted watch-collection tracker: inventory management,
-low-friction wear-session logging via an installable PWA, and a stats
-dashboard (day-of-week, time-of-day, total wear, cost-per-wear, calendar
-views). Runs as a SvelteKit app + Postgres via docker compose on a
-homelab, reachable from anywhere via cloudflared.
+A self-hosted, multi-tenant watch-collection tracker: self-serve accounts,
+inventory management, low-friction wear-session logging via an installable
+PWA, and a stats dashboard (day-of-week, time-of-day, total wear,
+cost-per-wear, calendar views). Runs as a SvelteKit app + Postgres via
+docker compose on a homelab, reachable from anywhere via cloudflared.
 
 ![dashboard screenshot placeholder](docs/screenshot.png)
 <!-- TODO: replace with a real screenshot after first deploy -->
@@ -17,14 +17,17 @@ homelab, reachable from anywhere via cloudflared.
 
 ```sh
 cp .env.example .env
-# edit .env: set DASH_PASSWORD (the login password) and ORIGIN to the
-# exact URL you'll load the dashboard from
+# edit .env: set POSTGRES_PASSWORD, ORIGIN (the exact URL you'll load the
+# dashboard from), and — to actually receive verify/reset emails —
+# RESEND_API_KEY, MAIL_FROM, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY.
+# Leaving RESEND_API_KEY unset logs account emails to the container's
+# stdout instead of sending them.
 docker compose up -d
 ```
 
-The app serves on port 3000. Every page sits behind a single-password
-"wrist check" login; sessions last 30 days (sliding) so your phone stays
-logged in.
+The app serves on port 3000. Every page sits behind a per-account login
+(sign up with an email + password, verify by email); sessions last 30 days
+(sliding) so your phone stays logged in.
 
 ## Logging wear from your phone
 

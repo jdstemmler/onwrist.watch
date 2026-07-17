@@ -19,17 +19,20 @@ env $(cat .env.scratch | xargs) npm run dev
 `docker-compose.scratch.yml` starts a single `postgres:17-alpine` container
 (project `onwrist-scratch`) with `tmpfs` data (nothing persists across
 `down`), exposed on host port `55432`. `.env.scratch` points `DATABASE_URL`
-at it (`postgres://onwrist:scratch@localhost:55432/onwrist`) and sets a dev
-`DASH_PASSWORD` and `ORIGIN` for port 5199.
+at it (`postgres://onwrist:scratch@localhost:55432/onwrist`) and sets
+`ORIGIN` for port 5199, plus Cloudflare's official always-pass Turnstile
+test keys and a `MAIL_FROM` — it deliberately omits `RESEND_API_KEY`, so
+account emails print to the console via the log mailer instead of sending.
 
 Migrations run automatically on app startup (`getDb()` in
 `src/lib/server/db/index.ts` applies `drizzle/` migrations before serving).
 There's no separate migrate step.
 
-`npm run seed` seeds the scratch DB with 12 watches and ~4 months of wear
-history; it refuses to run against a non-empty database, so it's safe to
-call repeatedly during a fresh scratch-stack session but will no-op (exit 1)
-once seeded — tear down and re-`up` the scratch stack to reseed from empty.
+`npm run seed` seeds the scratch DB with one verified user (`seed@onwrist.local`)
+owning 12 watches and ~4 months of wear history; it refuses to run against a
+non-empty database, so it's safe to call repeatedly during a fresh
+scratch-stack session but will no-op (exit 1) once seeded — tear down and
+re-`up` the scratch stack to reseed from empty.
 
 Tear down when done: `docker compose -f docker-compose.scratch.yml -p onwrist-scratch down`.
 
@@ -46,13 +49,35 @@ the production compose project and its persistent volumes.
 - **`horolog`** (the app) — built from the repo `Dockerfile`, port 3000.
   Connects to the db service via `DATABASE_URL:
   postgres://onwrist:${POSTGRES_PASSWORD}@db:5432/onwrist`. Waits for the db
-  healthcheck before starting. Key env: `DASH_PASSWORD` (required),
-  `ORIGIN` (required — must match the exact URL the dashboard is loaded
-  from, or SvelteKit's CSRF check rejects form POSTs), `BODY_SIZE_LIMIT`
-  (default `25M`, needed because adapter-node caps request bodies at 512K by
-  default and phone photo uploads exceed that), `APP_NAME` (display name;
-  will be `onwrist` post-rename), `HOME_TZ`, `SESSION_DAYS`,
-  `STALE_SESSION_HOURS`.
+  healthcheck before starting. Accounts now exist (self-serve signup/verify/
+  login/reset/change-email), so auth env moved from a single shared password
+  to per-account config. Env consumed by the app (`src/lib/server/config.ts`):
+
+  | Var | Meaning |
+  | --- | --- |
+  | `ORIGIN` | Required — must match the exact URL the dashboard is loaded from, or SvelteKit's CSRF check rejects form POSTs. Also used to build absolute links in account emails. |
+  | `SESSION_DAYS` | Login session length in days, sliding (default 30). |
+  | `APP_NAME` | Display name (nav brand, page titles, PWA name); default `onwrist`. |
+  | `BODY_SIZE_LIMIT` | Default `25M` — adapter-node caps request bodies at 512K by default and phone photo uploads exceed that. |
+  | `DATA_DIR` | Photo storage root; default `./data`. |
+  | `MAIL_FROM` | From-address for account emails (verify/reset/change). |
+  | `RESEND_API_KEY` | Resend API key for sending account emails. **Unset ⇒ emails are logged to stdout, not sent** — fine for a homelab box without outbound mail configured, but real users won't receive their verify/reset links until this is set. |
+  | `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile bot check on signup. |
+  | `POSTGRES_PASSWORD` | Postgres superuser password for the `db` service (required, no default). |
+
+  Per-user preferences — home timezone and the stale-session-open nudge
+  threshold — live on the `users` row and are edited on `/settings`; they are
+  no longer environment variables (`HOME_TZ`, `STALE_SESSION_HOURS` are
+  gone). There's likewise no `DASH_PASSWORD` — login is per-account
+  email+password.
+
+  **Known gap:** `docker-compose.yml` on this branch still declares
+  `DASH_PASSWORD` (required, no default), `HOME_TZ`, and `STALE_SESSION_HOURS`
+  as container env — leftovers from before accounts landed that the app no
+  longer reads. `.env.example` was updated to the table above (it has no
+  `DASH_PASSWORD`), so the compose file and the example env are currently out
+  of sync; treat `docker-compose.yml`'s env block as needing a follow-up fix,
+  not as authoritative.
 
 Photos are stored on disk by the `PhotoStorage` fs driver
 (`src/lib/server/storage/fs.ts`) under `${DATA_DIR ?? './data'}/photos`,
@@ -63,7 +88,8 @@ is a documented follow-on for when the app leaves the homelab (see
 
 In front of both services: an existing cloudflared tunnel pointed at
 `localhost:3000`. Cloudflare Access in front of that is optional
-belt-and-suspenders; the app has its own single-password login regardless.
+belt-and-suspenders; the app has its own per-account login (with rate
+limiting and a Turnstile check on signup) regardless.
 
 **Status this branch:** the `db` service and `DATABASE_URL` wiring above are
 merged into `docker-compose.yml`, but production has never been run against
@@ -75,6 +101,8 @@ and cutover land (see below).
 ## Backup
 
 Two things need backing up: the Postgres database and the photos directory.
+The `users`/`email_tokens`/`rate_limits` tables are ordinary tables in the
+same database — `pg_dump` picks them up automatically, no separate step.
 
 **Database** — nightly `pg_dump` via cron on the host, dumping through the
 running container:
@@ -88,7 +116,9 @@ Prune old dumps on whatever retention policy you're comfortable with, e.g.
 `find /path/to/backups -name 'onwrist-*.sql.gz' -mtime +30 -delete`.
 
 **Photos** — rsync the data directory to backup storage after (or
-independently of) the dump:
+independently of) the dump. Files are stored per-user-prefixed
+(`data/photos/<userId>/<watchId>/<uuid>.webp`), but that's just key layout —
+back up the whole tree, no per-user step needed:
 
 ```sh
 rsync -av --delete /path/to/onwrist/data/photos/ /path/to/backups/photos/
@@ -144,8 +174,12 @@ that happens):
 ## Plan C pointer
 
 The SQLite → Postgres data migration and the actual production cutover are
-Plan C's scope, not this branch's. Until Plan C runs, **production stays on
-the pre-Plan-A image** (SQLite-backed), fully stopped, with its `data/`
-directory preserved as the rollback path. Nothing in this doc authorizes
-bringing up the Postgres-backed `docker-compose.yml` against real data —
-that only happens as part of Plan C's migration/cutover procedure.
+Plan C's scope, not this branch's. Accounts (self-serve signup, per-user
+tenancy, quotas) now exist in the app, but there's still no admin role UI,
+no admin seeding, and no landing page — those ship with Plan C too. Until
+Plan C runs, **production stays on the pre-Plan-A image** (SQLite-backed),
+fully stopped, with its `data/` directory preserved as the rollback path.
+Nothing in this doc authorizes bringing up the Postgres-backed
+`docker-compose.yml` against real data — that only happens as part of Plan
+C's migration/cutover procedure (which will also need to fix the stale
+`DASH_PASSWORD`/`HOME_TZ`/`STALE_SESSION_HOURS` env block noted above).
