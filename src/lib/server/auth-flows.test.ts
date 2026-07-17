@@ -319,7 +319,7 @@ describe('login', () => {
 		}
 	});
 
-	it('over-limit path returns the same uniform failure shape as a wrong password, not a distinct 429 body', async () => {
+	it('over-limit login returns a 429 rate-limit response; lockout is existence-independent so it is not an enumeration oracle', async () => {
 		for (let i = 0; i < LIMITS.loginAccount.max; i++) {
 			await login(deps, { email: 'a@b.com', password: 'wrong' }, `5.8.8.${i}`);
 		}
