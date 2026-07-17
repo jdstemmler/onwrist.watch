@@ -78,6 +78,10 @@ export const actions: Actions = {
 			});
 		}
 
+		if (homeTz !== undefined && !IANA_TIME_ZONES.has(homeTz)) {
+			return fail(400, { action: 'prefs', message: 'Pick a timezone from the list' });
+		}
+
 		try {
 			await updatePrefs(await getDb(), locals.user!.id, { homeTz, staleSessionHours });
 		} catch (e) {
