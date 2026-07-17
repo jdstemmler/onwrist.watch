@@ -22,7 +22,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	return new Response(new Uint8Array(data), {
 		headers: {
 			'content-type': MIME[path.extname(params.path!).toLowerCase()] ?? 'application/octet-stream',
-			'cache-control': 'public, max-age=31536000, immutable'
+			'cache-control': 'private, max-age=31536000, immutable'
 		}
 	});
 };

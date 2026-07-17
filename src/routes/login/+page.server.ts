@@ -7,7 +7,8 @@ import { login } from '$lib/server/flows';
 
 /** Only same-app relative paths may be redirect targets (no open redirects). */
 function safeNext(raw: string | null): string {
-	if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/login')) return '/';
+	// reject backslashes: browsers normalize \ to / (open-redirect bypass)
+	if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/login') || raw.includes('\\')) return '/';
 	return raw;
 }
 
