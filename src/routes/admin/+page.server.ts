@@ -28,11 +28,21 @@ const uid = (form: FormData) => Number(form.get('userId'));
 export const actions: Actions = {
 	disable: async ({ locals, request }) => {
 		gate(locals);
-		await setUserDisabled(await getDb(), uid(await request.formData()), true);
+		try {
+			await setUserDisabled(await getDb(), uid(await request.formData()), true);
+		} catch (e) {
+			if (e instanceof StateError) return fail(e.status, { message: e.message });
+			throw e;
+		}
 	},
 	enable: async ({ locals, request }) => {
 		gate(locals);
-		await setUserDisabled(await getDb(), uid(await request.formData()), false);
+		try {
+			await setUserDisabled(await getDb(), uid(await request.formData()), false);
+		} catch (e) {
+			if (e instanceof StateError) return fail(e.status, { message: e.message });
+			throw e;
+		}
 	},
 	delete: async ({ locals, request }) => {
 		gate(locals);
@@ -54,6 +64,13 @@ export const actions: Actions = {
 	quota: async ({ locals, request }) => {
 		gate(locals);
 		const form = await request.formData();
-		await setQuotaMultiplier(await getDb(), uid(form), Number(form.get('quotaMultiplier')));
+		const n = Number(form.get('quotaMultiplier'));
+		if (!Number.isFinite(n)) return fail(400, { message: 'Invalid quota' });
+		try {
+			await setQuotaMultiplier(await getDb(), uid(form), n);
+		} catch (e) {
+			if (e instanceof StateError) return fail(e.status, { message: e.message });
+			throw e;
+		}
 	}
 };

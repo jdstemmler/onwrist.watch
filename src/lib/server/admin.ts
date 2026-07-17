@@ -69,6 +69,10 @@ export async function listUsersWithMeta(db: DB, storage: PhotoStorage = getStora
 }
 
 export async function setUserDisabled(db: DB, userId: number, disabled: boolean, now = new Date()): Promise<void> {
+	if (disabled) {
+		const target = (await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1))[0];
+		if (target?.role === 'admin') throw new StateError('Admin accounts can’t be disabled here', 400);
+	}
 	await db.transaction(async (tx) => {
 		await tx.update(users).set({ disabledAt: disabled ? now : null }).where(eq(users.id, userId));
 		if (disabled) await revokeAllSessions(tx, userId);

@@ -94,6 +94,23 @@ describe('setUserDisabled', () => {
 		await setUserDisabled(db, u.id, false);
 		expect((await db.select().from(users).where(eq(users.id, u.id)))[0].disabledAt).toBeNull();
 	});
+
+	it('rejects disabling an admin (lockout guard) but still allows re-enabling one', async () => {
+		const [adm] = await db.insert(users).values({ email: 'adm@b.com', passwordHash: 'x', role: 'admin' }).returning();
+		await db.insert(authSessions).values({ userId: adm.id, tokenHash: 'h', expiresAt: new Date(Date.now() + 1e6) });
+
+		await expect(setUserDisabled(db, adm.id, true)).rejects.toThrow(StateError);
+		expect((await db.select().from(users).where(eq(users.id, adm.id)))[0].disabledAt).toBeNull();
+		expect(await db.select().from(authSessions).where(eq(authSessions.userId, adm.id))).toHaveLength(1);
+
+		await expect(setUserDisabled(db, adm.id, false)).resolves.not.toThrow();
+	});
+
+	it('still allows disabling a member', async () => {
+		const [m] = await db.insert(users).values({ email: 'm2@b.com', passwordHash: 'x' }).returning();
+		await setUserDisabled(db, m.id, true);
+		expect((await db.select().from(users).where(eq(users.id, m.id)))[0].disabledAt).not.toBeNull();
+	});
 });
 
 describe('deleteUser', () => {
