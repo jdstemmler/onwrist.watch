@@ -110,6 +110,18 @@ describe('migrateLegacy', () => {
 		expect(await db.select().from(watches)).toHaveLength(0);
 	});
 
+	it('rolls back to an empty target when a copied photo comes back with mismatched bytes', async () => {
+		// A storage whose get() returns a different/truncated buffer than what was put()
+		// makes the byte-integrity check fail → mismatch → rollback.
+		const storage = createFsStorage(storageRoot);
+		const corruptingStorage = { ...storage, get: async () => Buffer.from('TRUNC') } as typeof storage;
+		await expect(
+			migrateLegacy(sqlitePath, db, corruptingStorage, { ownerEmail: 'o@x.com', legacyPhotosDir: legacyPhotos })
+		).rejects.toThrow(MigrationError);
+		expect(await db.select().from(users)).toHaveLength(0);
+		expect(await db.select().from(watches)).toHaveLength(0);
+	});
+
 	it('sessionChecksum is order-independent and interval-sensitive', () => {
 		const a = sessionChecksum([{ startedAt: new Date(1), endedAt: new Date(2) }, { startedAt: new Date(3), endedAt: null }]);
 		const b = sessionChecksum([{ startedAt: new Date(3), endedAt: null }, { startedAt: new Date(1), endedAt: new Date(2) }]);

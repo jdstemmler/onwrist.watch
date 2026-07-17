@@ -40,9 +40,10 @@ try {
 } catch (err) {
 	if (err instanceof MigrationError) {
 		console.error(`Migration failed: ${err.message}`);
-		process.exit(1);
+		process.exitCode = 1;
+	} else {
+		throw err;
 	}
-	throw err;
 } finally {
 	await pool.end();
 }

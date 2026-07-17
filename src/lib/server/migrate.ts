@@ -111,6 +111,7 @@ export async function migrateLegacy(
 
 	let ownerId: number | undefined;
 	const copiedKeys: string[] = [];
+	const copiedPhotos: { key: string; sha256: string; size: number }[] = [];
 
 	try {
 		const watchIdMap = new Map<number, number>();
@@ -187,6 +188,11 @@ export async function migrateLegacy(
 				const bytes = fs.readFileSync(path.join(opts.legacyPhotosDir, p.file_path));
 				await storage.put(key, bytes);
 				copiedKeys.push(key);
+				copiedPhotos.push({
+					key,
+					sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+					size: bytes.length
+				});
 				await tx.insert(watchPhotos).values({
 					watchId: newWatchId,
 					filePath: key,
@@ -231,10 +237,21 @@ export async function migrateLegacy(
 				);
 			}
 
-			// Verify: every migrated photo is readable back from storage.
-			for (const photo of migratedPhotos) {
-				if ((await storage.get(photo.filePath)) === null) {
-					throw new MigrationError(`photo not readable back from storage: ${photo.filePath}`);
+			// Verify: every migrated photo is readable back from storage and its
+			// bytes match what was copied (size + sha256).
+			for (const photo of copiedPhotos) {
+				const retrieved = await storage.get(photo.key);
+				if (retrieved === null) {
+					throw new MigrationError(`photo not readable back from storage: ${photo.key}`);
+				}
+				if (retrieved.length !== photo.size) {
+					throw new MigrationError(
+						`photo size mismatch for ${photo.key}: expected ${photo.size}, got ${retrieved.length}`
+					);
+				}
+				const retrievedSha256 = crypto.createHash('sha256').update(retrieved).digest('hex');
+				if (retrievedSha256 !== photo.sha256) {
+					throw new MigrationError(`photo sha256 mismatch for ${photo.key}`);
 				}
 			}
 		});
