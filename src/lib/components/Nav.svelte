@@ -243,16 +243,26 @@
 		align-items: center;
 	}
 
-	@media (max-width: 30rem) {
+	/* Mobile: a single row can't hold brand + 3 links + theme/admin/gear/lock
+	   without overflowing a phone. Drop the section links onto their own
+	   centered second row (order: 2 + full basis) so nothing spills off-screen
+	   and every control stays reachable. No hamburger, no JS. */
+	@media (max-width: 40rem) {
 		nav {
-			gap: 0.85rem;
-			padding: 0.75rem 1rem;
+			flex-wrap: wrap;
+			row-gap: 0.5rem;
+			column-gap: 0.9rem;
+			padding: 0.7rem 1rem;
 		}
 		.links {
-			gap: 0.85rem;
+			order: 2;
+			flex-basis: 100%;
+			justify-content: center;
+			gap: 1.75rem;
 		}
-		.links a {
-			font-size: 0.82rem;
+		.brand {
+			font-size: 0.95rem;
+			letter-spacing: 0.1em;
 		}
 	}
 </style>
