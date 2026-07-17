@@ -72,7 +72,12 @@
 		</a>
 	{/if}
 	<form method="POST" action="/login?/logout" class="logout">
-		<button type="submit" title="Lock" aria-label="Lock">&#9919;</button>
+		<button type="submit" title="Lock" aria-label="Lock">
+			<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+				<rect x="3" y="7.2" width="10" height="6.8" rx="1.2" />
+				<path d="M5 7.2V5a3 3 0 0 1 6 0v2.2" />
+			</svg>
+		</button>
 	</form>
 </nav>
 
@@ -200,24 +205,29 @@
 		gap: 1.25rem;
 	}
 
-	a {
+	/* Only the primary section links get the size, underline, and current-page
+	   affordance — NOT the gear/admin/logout controls, which have their own
+	   styling (scoping this to `.links a` stops the underline bar leaking
+	   under the ⚙ gear and Admin link on /settings and /admin). */
+	.links a {
 		position: relative;
 		font-size: 0.9rem;
 		color: var(--fg-muted);
 		text-decoration: none;
 		padding-block: 0.25rem;
+		white-space: nowrap; /* keep "Wear Log" on one line when the row is tight */
 		transition: color 0.15s ease;
 	}
 
-	a:hover {
+	.links a:hover {
 		color: var(--fg);
 	}
 
-	a[aria-current='page'] {
+	.links a[aria-current='page'] {
 		color: var(--fg);
 	}
 
-	a[aria-current='page']::after {
+	.links a[aria-current='page']::after {
 		content: '';
 		position: absolute;
 		left: 0;
@@ -228,6 +238,11 @@
 		border-radius: 1px;
 	}
 
+	.logout button {
+		display: inline-flex;
+		align-items: center;
+	}
+
 	@media (max-width: 30rem) {
 		nav {
 			gap: 0.85rem;
@@ -236,7 +251,7 @@
 		.links {
 			gap: 0.85rem;
 		}
-		a {
+		.links a {
 			font-size: 0.82rem;
 		}
 	}
