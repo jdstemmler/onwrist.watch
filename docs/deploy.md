@@ -2,9 +2,8 @@
 
 onwrist runs as a SvelteKit app container plus a Postgres 17 container,
 normally on a homelab box behind a cloudflared tunnel. This doc covers local
-dev, the production topology, backups, and the eventual homelab → hosted
-move. It does **not** cover the SQLite → Postgres data migration — that's
-Plan C's job (see the pointer at the bottom).
+dev, the production topology, the one-time legacy cutover, backups, and the
+eventual homelab → hosted move.
 
 ## Local dev (scratch stack)
 
@@ -110,8 +109,157 @@ limiting and a Turnstile check on signup) regardless.
 merged into `docker-compose.yml`, but production has never been run against
 this compose file — production is currently stopped, still backed by SQLite
 (`data/watches.db`, `data/photos/`), and that SQLite data is the rollback
-path. Do not bring up the default compose project until Plan C's migration
-and cutover land (see below).
+path. Do not bring up the default compose project except as the deliberate,
+one-time "Legacy cutover" procedure below — bringing it up is the live
+go-live, not a routine action.
+
+## Legacy cutover (one-time)
+
+> ⚠️ **The cloudflared tunnel is already live, routed at `:3000`.** The old
+> single-user app is stopped, but the tunnel was never taken down. The new
+> stack also serves on **`:3000` — unchanged, no port flip**. That means
+> **the instant something binds `:3000`, it is publicly reachable through
+> the existing tunnel.** There is no separate "flip DNS" step to buy you
+> time — `docker compose up -d` (step 4 below) *is* the go-live moment.
+> Everything before it (bringing up only `db`, running the migration) stays
+> off `:3000` and is not public.
+
+This is a deliberate, operator-run, one-time procedure to move the existing
+single-user SQLite data (`data/watches.db`, `data/photos/`) onto this
+Postgres stack under an owner account. It is driven by
+`npx tsx scripts/migrate-legacy.ts` (`npm run migrate:legacy`), which reads
+the SQLite file **read-only** — it is never modified, so it remains the
+rollback path regardless of how the migration goes. The command refuses to
+run against a Postgres that already has watches, so a failed or aborted
+attempt can always be retried by wiping the target Postgres (see Rollback)
+and running it again.
+
+1. **Back up.** Belt-and-suspenders — the migration never writes to the
+   source — but copy `data/watches.db` and `data/photos/` somewhere safe
+   before starting anyway:
+   ```sh
+   cp data/watches.db /path/to/backups/pre-cutover-watches.db
+   cp -r data/photos /path/to/backups/pre-cutover-photos
+   ```
+2. **`.env` prerequisites.** Ensure `.env` (repo root) has: `POSTGRES_PASSWORD`,
+   `ORIGIN`, the mail/Turnstile vars if you want real account emails and the
+   signup captcha enforced, `ADMIN_EMAIL` (seeds the admin at app boot), and
+   **`OWNER_EMAIL`** — the address that will own the migrated collection.
+   `OWNER_EMAIL` is read only by the migration script (it isn't part of
+   `docker-compose.yml`'s `environment:` block, since the running app never
+   needs it), so it's fine to keep it in `.env` and export it into the
+   migration command's shell, or pass it inline as shown below.
+   `OWNER_EMAIL` and `ADMIN_EMAIL` must be **different** addresses — the
+   migration seeds the owner as a member, and `ensureAdmin` never promotes
+   an existing account, so a shared address would leave you with no admin
+   (silent `/admin` 404).
+3. **Bring up Postgres only, then migrate.** `docker compose up -d db`
+   starts just the `db` service — no app, nothing bound to `:3000`, nothing
+   public (`db` is not tunneled). `docker compose` reads `.env` on its own,
+   but the migration command below interpolates `${POSTGRES_PASSWORD}` into
+   a shell variable, and your interactive shell does **not** have it —
+   load `.env` into the shell first:
+   ```sh
+   set -a; . ./.env; set +a
+   ```
+   Do this once per shell before this step and before any later command in
+   this section that interpolates `.env` vars (`${POSTGRES_PASSWORD}`, or
+   the `-e ADMIN_EMAIL`/`-e MAIL_FROM`/etc. flags in step 4's preview
+   `docker run`). If `POSTGRES_PASSWORD` contains URL-special characters
+   (`@ / # : ?`), percent-encode them before they land in `DATABASE_URL`
+   (e.g. `@` → `%40`) or the connection string will parse incorrectly. Then
+   run the migration against the real data:
+   ```sh
+   docker compose up -d db
+   # db isn't published to the host by design (only :3000 is ever tunneled),
+   # so reach it via its container IP for this one step:
+   DB_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$(docker compose ps -q db)")
+   DATABASE_URL="postgres://onwrist:${POSTGRES_PASSWORD}@${DB_IP}:5432/onwrist" \
+     OWNER_EMAIL="you@example.com" \
+     npm run migrate:legacy
+   ```
+   > **⚠️ If `data/photos/` is root-owned (an old container created it) and
+   > you have no passwordless sudo, the host-run command above fails at the
+   > photo-copy step with `EACCES … mkdir data/photos/…` — the migration
+   > rolls back cleanly (Postgres left empty, source untouched), but it can't
+   > write the migrated photos as your user.** Run it instead inside a
+   > **root container** whose node major + libc match the host (host node
+   > 24/glibc → `node:24`), mounting the repo + `data/` and joining the db
+   > network. This also avoids needing `.env` in your shell for the DB host
+   > (`@db:5432` resolves on the compose network):
+   > ```sh
+   > PW=$(grep -E '^POSTGRES_PASSWORD=' .env | cut -d= -f2-)
+   > docker run --rm --network "$(docker inspect -f '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q db)")" \
+   >   -v "$PWD":/app -v "$PWD/data":/data -w /app \
+   >   -e LEGACY_DB=/data/watches.db -e LEGACY_PHOTOS=/data/photos -e DATA_DIR=/data \
+   >   -e OWNER_EMAIL="you@example.com" \
+   >   -e DATABASE_URL="postgres://onwrist:${PW}@db:5432/onwrist" \
+   >   node:24 npx tsx scripts/migrate-legacy.ts
+   > ```
+   > The migrated photos are then root-owned, matching what the (root)
+   > app container reads. Note: a failed host attempt burns an identity id
+   > on rollback, so the owner's `id` may be 2 rather than 1 — harmless.
+   This runs against `LEGACY_DB=./data/watches.db` and
+   `LEGACY_PHOTOS=./data/photos` (the script's defaults — the real data, not
+   a copy) and writes migrated photos under `DATA_DIR=./data` (default),
+   i.e. into the same `data/` tree the app's `./data:/data` bind volume
+   already serves. Confirm the printed verification summary — owner email,
+   watch/session/photo counts, `checksum: OK` — before continuing. **Nothing
+   is public yet.**
+4. **GO-LIVE (immediate public exposure).** `docker compose up -d` brings up
+   the full stack; the app binds `:3000` and is instantly live through the
+   existing tunnel. Log in as the owner via the reset flow (`/reset` against
+   `OWNER_EMAIL`) — production's `.env` has `RESEND_API_KEY` set, so this is
+   a **real email send** to the owner's inbox, not a logged link (if
+   `RESEND_API_KEY` is unset, the reset link is in
+   `docker compose logs horolog` instead of an email); the reset link
+   expires in **30 minutes**, so only request it once you're at the
+   keyboard ready to use it. Spot-check the migrated collection, stats, and
+   the photo render on the real URL. Do the same for the admin
+   (`ADMIN_EMAIL`, seeded at boot by `ensureAdmin`) to confirm `/admin`
+   works.
+
+   **To verify privately first** instead of going straight to `:3000`,
+   build the image and run it manually on a throwaway host port before
+   touching the compose stack's `:3000` mapping. A plain `docker run` lands
+   on the default bridge network and can't reach the compose-network `db`,
+   so join that network explicitly and address `db` by its compose service
+   name instead of a container IP:
+   ```sh
+   docker build -t onwrist:cutover .
+   NET=$(docker inspect -f '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q db)")
+   docker run --rm -d --name onwrist-preview -p 127.0.0.1:8443:3000 \
+     --network "$NET" \
+     -e DATABASE_URL="postgres://onwrist:${POSTGRES_PASSWORD}@db:5432/onwrist" \
+     -e ORIGIN="http://localhost:8443" -e ADMIN_EMAIL \
+     -e SESSION_DAYS -e APP_NAME -e MAIL_FROM -e RESEND_API_KEY \
+     -e TURNSTILE_SITE_KEY -e TURNSTILE_SECRET_KEY \
+     -v "$(pwd)/data:/data" onwrist:cutover
+   ```
+   This still interpolates `.env` vars (`${POSTGRES_PASSWORD}`, and the
+   bare `-e ADMIN_EMAIL`/`-e MAIL_FROM`/etc. flags pull their values from
+   the operator's shell environment) — make sure step 3's
+   `set -a; . ./.env; set +a` is still in effect in this shell. Browse
+   `http://localhost:8443` on the homelab box (nothing routes to `8443`
+   from the tunnel), confirm what you need, then
+   `docker stop onwrist-preview` and run step 4's `docker compose up -d` for
+   the real go-live.
+5. **Keep the SQLite file as the rollback** for a few weeks — `data/`
+   already lives outside anything the migration touches destructively.
+   Once you're confident the cutover is solid, a follow-up removes
+   `OWNER_EMAIL` and the migration scaffolding (`scripts/migrate-legacy.ts`,
+   `scripts/rehearse-migration.sh`, the `better-sqlite3` devDependency) —
+   deliberately not done as part of landing this.
+6. **Rollback.** The SQLite source was never modified, so reverting is
+   simple: `docker compose down` (stops the new stack, `:3000` is free
+   again), then bring the old single-user SQLite-backed image back up on
+   `:3000`. If the migration itself failed partway (verification mismatch),
+   `migrateLegacy` already rolled back its own writes (deletes the owner —
+   cascading watches/sessions/photos — and any copied photo objects), so
+   Postgres is clean and a re-run of step 3 is safe without any manual
+   cleanup. To deliberately redo a **successful** migration instead (e.g.
+   wrong `OWNER_EMAIL`), wipe the target Postgres first — `docker compose
+   down -v` (this destroys the `pgdata` volume) — then re-run from step 3.
 
 ## Backup
 
@@ -186,14 +334,12 @@ that happens):
 4. Cut the tunnel over to the new app instance, verify, then decommission
    the homelab containers (keep the last backup for a while regardless).
 
-## Plan C pointer
+## Cutover status
 
-The SQLite → Postgres data migration and the actual production cutover are
-Plan C's scope, not this branch's. Accounts (self-serve signup, per-user
-tenancy, quotas) now exist in the app, but there's still no admin role UI,
-no admin seeding, and no landing page — those ship with Plan C too. Until
-Plan C runs, **production stays on the pre-Plan-A image** (SQLite-backed),
-fully stopped, with its `data/` directory preserved as the rollback path.
-Nothing in this doc authorizes bringing up the Postgres-backed
-`docker-compose.yml` against real data — that only happens as part of Plan
-C's migration/cutover procedure.
+Accounts (self-serve signup, per-user tenancy, quotas), the admin console,
+and the landing page all exist in the app (Plans B and C). The "Legacy
+cutover" section above is the only thing that authorizes bringing up the
+Postgres-backed `docker-compose.yml` against the real `data/` directory —
+until an operator deliberately runs it, **production stays on the
+pre-Plan-A image** (SQLite-backed), fully stopped, with its `data/`
+directory preserved as the rollback path.
