@@ -18,9 +18,9 @@
 		return `${v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
 	}
 
-	function confirmSubmit(message: string) {
-		return (e: SubmitEvent) => {
-			if (!confirm(message)) e.preventDefault();
+	function confirmEnhance(message: string) {
+		return ({ cancel }: { cancel: () => void }) => {
+			if (!confirm(message)) cancel();
 		};
 	}
 </script>
@@ -99,9 +99,8 @@
 							<form
 								method="POST"
 								action="?/disable"
-								use:enhance
+								use:enhance={confirmEnhance(`Disable ${u.email}? This revokes all of their sessions.`)}
 								class="inline"
-								onsubmit={confirmSubmit(`Disable ${u.email}? This revokes all of their sessions.`)}
 							>
 								<input type="hidden" name="userId" value={u.id} />
 								<button type="submit" class="small">Disable</button>
@@ -111,9 +110,8 @@
 							<form
 								method="POST"
 								action="?/delete"
-								use:enhance
+								use:enhance={confirmEnhance(`Permanently delete ${u.email} and all their watches, photos, and wear history? This can't be undone.`)}
 								class="inline"
-								onsubmit={confirmSubmit(`Permanently delete ${u.email} and all their watches, photos, and wear history? This can't be undone.`)}
 							>
 								<input type="hidden" name="userId" value={u.id} />
 								<button type="submit" class="small danger">Delete</button>

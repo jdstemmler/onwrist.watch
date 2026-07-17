@@ -52,6 +52,15 @@ describe('ensureAdmin', () => {
 		await ensureAdmin(db);
 		expect((await db.select().from(users)).filter((u) => u.role === 'admin')).toHaveLength(1);
 	});
+
+	it('is a no-op (does not throw, does not promote) when a member already occupies ADMIN_EMAIL', async () => {
+		await db.insert(users).values({ email: 'admin@onwrist.watch', passwordHash: 'x', role: 'member' });
+		process.env.ADMIN_EMAIL = 'Admin@Onwrist.WATCH';
+		await expect(ensureAdmin(db)).resolves.not.toThrow();
+		const all = await db.select().from(users);
+		expect(all).toHaveLength(1);
+		expect(all[0].role).toBe('member');
+	});
 });
 
 describe('isAdmin', () => {

@@ -24,12 +24,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 const uid = (form: FormData) => Number(form.get('userId'));
+const invalidUser = () => fail(400, { message: 'Invalid user' });
 
 export const actions: Actions = {
 	disable: async ({ locals, request }) => {
 		gate(locals);
+		const id = uid(await request.formData());
+		if (!Number.isInteger(id)) return invalidUser();
 		try {
-			await setUserDisabled(await getDb(), uid(await request.formData()), true);
+			await setUserDisabled(await getDb(), id, true);
 		} catch (e) {
 			if (e instanceof StateError) return fail(e.status, { message: e.message });
 			throw e;
@@ -37,8 +40,10 @@ export const actions: Actions = {
 	},
 	enable: async ({ locals, request }) => {
 		gate(locals);
+		const id = uid(await request.formData());
+		if (!Number.isInteger(id)) return invalidUser();
 		try {
-			await setUserDisabled(await getDb(), uid(await request.formData()), false);
+			await setUserDisabled(await getDb(), id, false);
 		} catch (e) {
 			if (e instanceof StateError) return fail(e.status, { message: e.message });
 			throw e;
@@ -46,8 +51,10 @@ export const actions: Actions = {
 	},
 	delete: async ({ locals, request }) => {
 		gate(locals);
+		const id = uid(await request.formData());
+		if (!Number.isInteger(id)) return invalidUser();
 		try {
-			await deleteUser(await getDb(), uid(await request.formData()));
+			await deleteUser(await getDb(), id);
 		} catch (e) {
 			if (e instanceof StateError) return fail(e.status, { message: e.message });
 			throw e;
@@ -55,19 +62,20 @@ export const actions: Actions = {
 	},
 	resend: async ({ locals, request }) => {
 		gate(locals);
-		const result = await resendVerification(
-			{ db: await getDb(), mailer: getMailer() },
-			uid(await request.formData())
-		);
+		const id = uid(await request.formData());
+		if (!Number.isInteger(id)) return invalidUser();
+		const result = await resendVerification({ db: await getDb(), mailer: getMailer() }, id);
 		if (!result.ok) return fail(result.status, { message: result.message });
 	},
 	quota: async ({ locals, request }) => {
 		gate(locals);
 		const form = await request.formData();
+		const id = uid(form);
+		if (!Number.isInteger(id)) return invalidUser();
 		const n = Number(form.get('quotaMultiplier'));
 		if (!Number.isFinite(n)) return fail(400, { message: 'Invalid quota' });
 		try {
-			await setQuotaMultiplier(await getDb(), uid(form), n);
+			await setQuotaMultiplier(await getDb(), id, n);
 		} catch (e) {
 			if (e instanceof StateError) return fail(e.status, { message: e.message });
 			throw e;

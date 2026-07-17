@@ -10,19 +10,33 @@ import { getStorage, type PhotoStorage } from './storage';
 /** Boot-time seed: create the ops admin from ADMIN_EMAIL if none exists.
  * Idempotent; no-op without ADMIN_EMAIL or when any admin already exists.
  * The password is unusable random bytes — the operator sets a real one via
- * the forgot-password flow. Never emails, never rewrites an existing user. */
+ * the forgot-password flow. Never emails, never rewrites an existing user.
+ * If a MEMBER already occupies the ADMIN_EMAIL address, the insert conflicts
+ * on the unique email index and is silently skipped (no-op, not a crash) —
+ * this must never throw, since hooks.server.ts awaits it on every request. */
 export async function ensureAdmin(db: DB): Promise<void> {
 	const raw = process.env.ADMIN_EMAIL?.trim();
 	if (!raw) return;
 	const existing = (await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1))[0];
 	if (existing) return;
+	const key = emailKey(raw);
 	const unusable = crypto.randomBytes(32).toString('base64url');
-	await db.insert(users).values({
-		email: emailKey(raw),
-		passwordHash: await hashPassword(unusable),
-		role: 'admin',
-		emailVerifiedAt: new Date()
-	});
+	await db
+		.insert(users)
+		.values({
+			email: key,
+			passwordHash: await hashPassword(unusable),
+			role: 'admin',
+			emailVerifiedAt: new Date()
+		})
+		.onConflictDoNothing({ target: users.email });
+
+	const seeded = (await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1))[0];
+	if (!seeded) {
+		console.warn(
+			`ensureAdmin: ADMIN_EMAIL (${key}) is already taken by a non-admin account; no admin was seeded.`
+		);
+	}
 }
 
 export function isAdmin(user: { role: 'admin' | 'member' } | null): boolean {
