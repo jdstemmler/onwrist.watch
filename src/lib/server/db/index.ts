@@ -15,6 +15,7 @@ let _migrated: Promise<void> | undefined;
 export async function getDb(): Promise<DB> {
 	if (!_db) {
 		const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+		pool.on('error', (e) => console.error('pg pool error', e));
 		_db = createDb(pool);
 	}
 	_migrated ??= migrate(_db, { migrationsFolder: 'drizzle' }).catch((e) => {

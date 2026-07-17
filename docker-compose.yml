@@ -18,18 +18,22 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DASH_PASSWORD: ${DASH_PASSWORD:?set DASH_PASSWORD in .env}
       DATABASE_URL: postgres://onwrist:${POSTGRES_PASSWORD}@db:5432/onwrist
       SESSION_DAYS: ${SESSION_DAYS:-30}
       APP_NAME: ${APP_NAME:-horolog}
       # adapter-node caps request bodies at 512K by default — far below a
       # phone photo. Governs the photo-upload forms.
       BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-25M}
-      HOME_TZ: ${HOME_TZ:-America/Los_Angeles}
-      STALE_SESSION_HOURS: ${STALE_SESSION_HOURS:-24}
       # Must match the URL you load the dashboard from, or SvelteKit's CSRF
       # check rejects every form submission ("Cross-site POST ... forbidden").
-      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      ORIGIN: ${ORIGIN:?set ORIGIN in .env}
+      # Account emails (verify/reset/change) and signup captcha. Left empty
+      # by default so the app still boots without mail/captcha configured —
+      # empty RESEND_API_KEY falls back to logging mail to stdout.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
     volumes:
       - ./data:/data
     depends_on:

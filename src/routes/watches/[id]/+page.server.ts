@@ -1,22 +1,25 @@
 import { error } from '@sveltejs/kit';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
-import { config } from '$lib/server/config';
 import { watches, watchPhotos, wearSessions } from '$lib/server/db/schema';
 import { statsByWatch, statsByDow } from '$lib/server/stats';
 import { photoUrl } from '$lib/server/photos';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
+	const uid = locals.user!.id;
+	const homeTz = locals.user!.homeTz;
 	const db = await getDb();
 	const id = Number(params.id);
-	const watch = (await db.select().from(watches).where(eq(watches.id, id)).limit(1))[0];
+	const watch = (
+		await db.select().from(watches).where(and(eq(watches.id, id), eq(watches.userId, uid))).limit(1)
+	)[0];
 	if (!watch) error(404, 'No such watch');
 	const now = new Date();
 	const [photos, statsRows, dowRows, sessions] = await Promise.all([
 		db.select().from(watchPhotos).where(eq(watchPhotos.watchId, id)),
-		statsByWatch(db, config.homeTz, now),
-		statsByDow(db, config.homeTz, now),
+		statsByWatch(db, uid, homeTz, now),
+		statsByDow(db, uid, homeTz, now),
 		db
 			.select()
 			.from(wearSessions)

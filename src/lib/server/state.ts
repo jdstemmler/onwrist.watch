@@ -1,4 +1,4 @@
-import { desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, isNotNull, sql } from 'drizzle-orm';
 import type { DB } from './db';
 import { watches, wearSessions } from './db/schema';
 import { getOpenSession, watchLabel } from './sessions';
@@ -11,29 +11,43 @@ export type StateResponse = {
 	watches: { id: number; label: string }[];
 };
 
-export async function getState(db: DB, tz: string): Promise<StateResponse> {
-	const open = await getOpenSession(db);
+export async function getState(db: DB, userId: number, tz: string): Promise<StateResponse> {
+	const open = await getOpenSession(db, userId);
 
 	const owned = (
 		await db
 			.select({
 				watch: watches,
-				lastWorn: sql<number | null>`(
-					select max(started_at) from wear_sessions s where s.watch_id = ${watches.id}
+				// timestamptz -> the driver hands back a Date (node-postgres) or a
+				// pg-formatted string (PGlite in tests) — normalized below via `new Date(...)`.
+				// NB: the outer-row correlation is written as a literal `watches.id`
+				// (not the interpolated ${watches.id}) — drizzle renders an
+				// interpolated column reference unqualified (bare "id"), which the
+				// correlated subquery's own `wear_sessions.id` column then shadows,
+				// silently comparing wear_sessions.watch_id to wear_sessions.id
+				// instead of the outer watches.id (always NULL — no reordering ever
+				// happens). Bare `watches.id` avoids the outer projection colliding
+				// with the subquery's own same-named column.
+				lastWorn: sql<Date | null>`(
+					select max(started_at) from wear_sessions s where s.watch_id = watches.id
 				)`
 			})
 			.from(watches)
-			.where(eq(watches.status, 'owned'))
-	).sort((a, b) => (b.lastWorn ?? 0) - (a.lastWorn ?? 0));
+			.where(and(eq(watches.userId, userId), eq(watches.status, 'owned')))
+	).sort(
+		(a, b) =>
+			(b.lastWorn ? new Date(b.lastWorn).getTime() : 0) -
+			(a.lastWorn ? new Date(a.lastWorn).getTime() : 0)
+	);
 
 	const list = owned
 		.filter((r) => r.watch.id !== open?.watchId)
 		.map((r) => ({ id: r.watch.id, label: watchLabel(r.watch) }));
 
-
 	if (open) {
-		const w = owned.find((r) => r.watch.id === open.watchId)?.watch
-			?? (await db.select().from(watches).where(eq(watches.id, open.watchId)).limit(1))[0]!;
+		const w =
+			owned.find((r) => r.watch.id === open.watchId)?.watch ??
+			(await db.select().from(watches).where(eq(watches.id, open.watchId)).limit(1))[0]!;
 		const label = watchLabel(w);
 		return {
 			status_line: `Wearing: ${label} — since ${formatTime(open.startedAt, tz)}`,
@@ -45,9 +59,10 @@ export async function getState(db: DB, tz: string): Promise<StateResponse> {
 
 	const last = (
 		await db
-			.select()
+			.select({ ...getTableColumns(wearSessions) })
 			.from(wearSessions)
-			.where(isNotNull(wearSessions.endedAt))
+			.innerJoin(watches, eq(watches.id, wearSessions.watchId))
+			.where(and(eq(watches.userId, userId), isNotNull(wearSessions.endedAt)))
 			.orderBy(desc(wearSessions.endedAt))
 			.limit(1)
 	)[0];

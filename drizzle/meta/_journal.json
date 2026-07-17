@@ -15,6 +15,13 @@
       "when": 1784244097985,
       "tag": "0001_charming_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784245704539,
+      "tag": "0002_minor_whistler",
+      "breakpoints": true
     }
   ]
 }

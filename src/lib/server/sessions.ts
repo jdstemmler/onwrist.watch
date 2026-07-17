@@ -1,9 +1,13 @@
-import { and, eq, gt, isNull, lt, ne, or } from 'drizzle-orm';
+import { and, eq, gt, getTableColumns, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { DB } from './db';
-import { wearSessions, type WearSession } from './db/schema';
+import { users, watches, wearSessions, type WearSession } from './db/schema';
 
 export class StateError extends Error {
-	status = 409;
+	status: number;
+	constructor(message: string, status = 409) {
+		super(message);
+		this.status = status;
+	}
 }
 
 // Sentinel "end of time" so open sessions participate in overlap math.
@@ -16,8 +20,13 @@ export function watchLabel(w: { nickname: string | null; brand: string; model: s
 	return w.nickname ?? `${w.brand} ${w.model}`;
 }
 
-export async function getOpenSession(db: DB): Promise<WearSession | null> {
-	const rows = await db.select().from(wearSessions).where(isNull(wearSessions.endedAt)).limit(1);
+export async function getOpenSession(db: DB, userId: number): Promise<WearSession | null> {
+	const rows = await db
+		.select({ ...getTableColumns(wearSessions) })
+		.from(wearSessions)
+		.innerJoin(watches, eq(watches.id, wearSessions.watchId))
+		.where(and(eq(watches.userId, userId), isNull(wearSessions.endedAt)))
+		.limit(1);
 	return rows[0] ?? null;
 }
 
@@ -26,14 +35,34 @@ function assertRange(startedAt: Date, endedAt: Date | null) {
 		throw new StateError('End time must be after start time');
 }
 
-async function assertNoOverlap(db: DB, startedAt: Date, endedAt: Date | null, excludeId?: number) {
+/** Throws (also covers not-found) unless `watchId` belongs to `userId`. */
+async function assertWatchOwned(db: DB, userId: number, watchId: number) {
+	const row = (
+		await db
+			.select({ id: watches.id })
+			.from(watches)
+			.where(and(eq(watches.id, watchId), eq(watches.userId, userId)))
+			.limit(1)
+	)[0];
+	if (!row) throw new StateError("That watch isn't yours");
+}
+
+async function assertNoOverlap(
+	db: DB,
+	userId: number,
+	startedAt: Date,
+	endedAt: Date | null,
+	excludeId?: number
+) {
 	const end = endedAt ?? FOREVER;
 	const clash = (
 		await db
 			.select({ id: wearSessions.id })
 			.from(wearSessions)
+			.innerJoin(watches, eq(watches.id, wearSessions.watchId))
 			.where(
 				and(
+					eq(watches.userId, userId),
 					excludeId === undefined ? undefined : ne(wearSessions.id, excludeId),
 					lt(wearSessions.startedAt, end),
 					or(isNull(wearSessions.endedAt), gt(wearSessions.endedAt, startedAt))
@@ -46,15 +75,25 @@ async function assertNoOverlap(db: DB, startedAt: Date, endedAt: Date | null, ex
 
 type Source = 'shortcut' | 'web' | 'backfill';
 
-export async function putOn(
-	db: DB,
+/** Serializes all mutations for a given user behind a row lock on their `users` row. */
+async function lockUser(tx: DB, userId: number) {
+	await tx.execute(sql`select id from ${users} where ${users.id} = ${userId} for update`);
+}
+
+// --- lock-free inner bodies, shared by putOn/takeOff/swap; callers own the tx + lock ---
+
+async function putOnInner(
+	tx: DB,
+	userId: number,
 	opts: { watchId: number; note?: string; at?: Date; source?: Source }
 ): Promise<WearSession> {
 	const at = opts.at ?? new Date();
-	if (await getOpenSession(db)) throw new StateError('Already wearing a watch — swap or take it off first');
-	await assertNoOverlap(db, at, null);
+	await assertWatchOwned(tx, userId, opts.watchId);
+	if (await getOpenSession(tx, userId))
+		throw new StateError('Already wearing a watch — swap or take it off first');
+	await assertNoOverlap(tx, userId, at, null);
 	return (
-		await db
+		await tx
 			.insert(wearSessions)
 			.values({
 				watchId: opts.watchId,
@@ -67,17 +106,18 @@ export async function putOn(
 	)[0];
 }
 
-export async function takeOff(
-	db: DB,
+async function takeOffInner(
+	tx: DB,
+	userId: number,
 	opts: { note?: string; at?: Date; source?: Source } = {}
 ): Promise<WearSession> {
-	const open = await getOpenSession(db);
+	const open = await getOpenSession(tx, userId);
 	if (!open) throw new StateError('No watch on right now');
 	const at = opts.at ?? new Date();
 	assertRange(open.startedAt, at);
 	const note = opts.note ? (open.note ? `${open.note}\n${opts.note}` : opts.note) : open.note;
 	return (
-		await db
+		await tx
 			.update(wearSessions)
 			.set({ endedAt: at, note, updatedAt: new Date() })
 			.where(eq(wearSessions.id, open.id))
@@ -85,68 +125,122 @@ export async function takeOff(
 	)[0];
 }
 
+export async function putOn(
+	db: DB,
+	userId: number,
+	opts: { watchId: number; note?: string; at?: Date; source?: Source }
+): Promise<WearSession> {
+	return await db.transaction(async (tx) => {
+		await lockUser(tx, userId);
+		return await putOnInner(tx, userId, opts);
+	});
+}
+
+export async function takeOff(
+	db: DB,
+	userId: number,
+	opts: { note?: string; at?: Date; source?: Source } = {}
+): Promise<WearSession> {
+	return await db.transaction(async (tx) => {
+		await lockUser(tx, userId);
+		return await takeOffInner(tx, userId, opts);
+	});
+}
+
 export async function swap(
 	db: DB,
+	userId: number,
 	opts: { watchId: number; note?: string; at?: Date; source?: Source }
 ): Promise<{ closed: WearSession; opened: WearSession }> {
-	const open = await getOpenSession(db);
-	if (!open) throw new StateError('No watch on — use put-on instead');
-	if (open.watchId === opts.watchId) throw new StateError('Already wearing that watch');
-	const at = opts.at ?? new Date();
 	return await db.transaction(async (tx) => {
-		const closed = await takeOff(tx, { at, source: opts.source });
-		const opened = await putOn(tx, { ...opts, at });
+		await lockUser(tx, userId);
+		const open = await getOpenSession(tx, userId);
+		if (!open) throw new StateError('No watch on — use put-on instead');
+		if (open.watchId === opts.watchId) throw new StateError('Already wearing that watch');
+		const at = opts.at ?? new Date();
+		const closed = await takeOffInner(tx, userId, { at, source: opts.source });
+		const opened = await putOnInner(tx, userId, { ...opts, at });
 		return { closed, opened };
 	});
 }
 
 export async function createSession(
 	db: DB,
+	userId: number,
 	opts: { watchId: number; startedAt: Date; endedAt?: Date | null; note?: string; source?: Source }
 ): Promise<WearSession> {
-	const endedAt = opts.endedAt ?? null;
-	assertRange(opts.startedAt, endedAt);
-	await assertNoOverlap(db, opts.startedAt, endedAt);
-	return (
+	return await db.transaction(async (tx) => {
+		await lockUser(tx, userId);
+		await assertWatchOwned(tx, userId, opts.watchId);
+		const endedAt = opts.endedAt ?? null;
+		assertRange(opts.startedAt, endedAt);
+		await assertNoOverlap(tx, userId, opts.startedAt, endedAt);
+		return (
+			await tx
+				.insert(wearSessions)
+				.values({
+					watchId: opts.watchId,
+					startedAt: opts.startedAt,
+					endedAt,
+					note: opts.note ?? null,
+					source: opts.source ?? 'backfill'
+				})
+				.returning()
+		)[0];
+	});
+}
+
+/** Throws StateError('Session not found') (also covers cross-tenant) unless `id` belongs to `userId`. */
+async function assertSessionOwned(db: DB, userId: number, id: number): Promise<WearSession> {
+	const existing = (
 		await db
-			.insert(wearSessions)
-			.values({
-				watchId: opts.watchId,
-				startedAt: opts.startedAt,
-				endedAt,
-				note: opts.note ?? null,
-				source: opts.source ?? 'backfill'
-			})
-			.returning()
+			.select({ ...getTableColumns(wearSessions) })
+			.from(wearSessions)
+			.innerJoin(watches, eq(watches.id, wearSessions.watchId))
+			.where(and(eq(wearSessions.id, id), eq(watches.userId, userId)))
+			.limit(1)
 	)[0];
+	if (!existing) throw new StateError('Session not found');
+	return existing;
 }
 
 export async function updateSession(
 	db: DB,
+	userId: number,
 	id: number,
 	patch: { startedAt?: Date; endedAt?: Date | null; note?: string | null; watchId?: number }
 ): Promise<WearSession> {
-	const existing = (await db.select().from(wearSessions).where(eq(wearSessions.id, id)).limit(1))[0];
-	if (!existing) throw new StateError('Session not found');
-	const startedAt = patch.startedAt ?? existing.startedAt;
-	const endedAt = patch.endedAt === undefined ? existing.endedAt : patch.endedAt;
-	assertRange(startedAt, endedAt);
-	await assertNoOverlap(db, startedAt, endedAt, id);
-	return (
-		await db
-			.update(wearSessions)
-			.set({
-				startedAt,
-				endedAt,
-				note: patch.note === undefined ? existing.note : patch.note,
-				watchId: patch.watchId ?? existing.watchId,
-				updatedAt: new Date()
-			})
-			.where(eq(wearSessions.id, id))
-			.returning()
-	)[0];
+	return await db.transaction(async (tx) => {
+		await lockUser(tx, userId);
+		const existing = await assertSessionOwned(tx, userId, id);
+		if (patch.watchId !== undefined) await assertWatchOwned(tx, userId, patch.watchId);
+		const startedAt = patch.startedAt ?? existing.startedAt;
+		const endedAt = patch.endedAt === undefined ? existing.endedAt : patch.endedAt;
+		assertRange(startedAt, endedAt);
+		await assertNoOverlap(tx, userId, startedAt, endedAt, id);
+		return (
+			await tx
+				.update(wearSessions)
+				.set({
+					startedAt,
+					endedAt,
+					note: patch.note === undefined ? existing.note : patch.note,
+					watchId: patch.watchId ?? existing.watchId,
+					updatedAt: new Date()
+				})
+				.where(eq(wearSessions.id, id))
+				.returning()
+		)[0];
+	});
 }
 
-export async function deleteSession(db: DB, id: number): Promise<void> {
-	await db.delete(wearSessions).where(eq(wearSessions.id, id));
+/** Cross-tenant calls are a silent no-op (the row just isn't in `userId`'s ownership scope). */
+export async function deleteSession(db: DB, userId: number, id: number): Promise<void> {
+	await db.transaction(async (tx) => {
+		await lockUser(tx, userId);
+		const ownedWatchIds = tx.select({ id: watches.id }).from(watches).where(eq(watches.userId, userId));
+		await tx
+			.delete(wearSessions)
+			.where(and(eq(wearSessions.id, id), inArray(wearSessions.watchId, ownedWatchIds)));
+	});
 }

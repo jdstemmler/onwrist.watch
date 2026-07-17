@@ -1,4 +1,4 @@
-import { asc } from 'drizzle-orm';
+import { asc, eq, getTableColumns } from 'drizzle-orm';
 import type { DB } from './db';
 import { watches, wearSessions, type Watch, type WearSession } from './db/schema';
 import { watchLabel } from './sessions';
@@ -21,9 +21,14 @@ export function sliceSession(startedAt: Date, endedAt: Date, tz: string): HourSl
 	return out;
 }
 
-async function loadAll(db: DB, now: Date) {
-	const ws = await db.select().from(watches);
-	const sessions = await db.select().from(wearSessions).orderBy(asc(wearSessions.startedAt));
+async function loadAll(db: DB, userId: number, now: Date) {
+	const ws = await db.select().from(watches).where(eq(watches.userId, userId));
+	const sessions = await db
+		.select({ ...getTableColumns(wearSessions) })
+		.from(wearSessions)
+		.innerJoin(watches, eq(watches.id, wearSessions.watchId))
+		.where(eq(watches.userId, userId))
+		.orderBy(asc(wearSessions.startedAt));
 	const clamped = sessions.map((s) => ({ ...s, endedAt: s.endedAt ?? now }));
 	return { ws, sessions, clamped };
 }
@@ -34,8 +39,8 @@ export type WatchStats = {
 	lastWornAt: string | null; costPerWearCents: number | null;
 };
 
-export async function statsByWatch(db: DB, tz: string, now: Date): Promise<WatchStats[]> {
-	const { ws, clamped } = await loadAll(db, now);
+export async function statsByWatch(db: DB, userId: number, tz: string, now: Date): Promise<WatchStats[]> {
+	const { ws, clamped } = await loadAll(db, userId, now);
 	return ws.map((w) => {
 		const mine = clamped.filter((s) => s.watchId === w.id);
 		const days = new Set<string>();
@@ -62,8 +67,8 @@ export async function statsByWatch(db: DB, tz: string, now: Date): Promise<Watch
 	});
 }
 
-export async function statsSummary(db: DB, tz: string, now: Date) {
-	const { ws, sessions, clamped } = await loadAll(db, now);
+export async function statsSummary(db: DB, userId: number, tz: string, now: Date) {
+	const { ws, sessions, clamped } = await loadAll(db, userId, now);
 	let minutes = 0;
 	for (const s of clamped)
 		for (const slice of sliceSession(s.startedAt, s.endedAt, tz)) minutes += slice.minutes;
@@ -75,8 +80,8 @@ export async function statsSummary(db: DB, tz: string, now: Date) {
 	};
 }
 
-export async function statsByDow(db: DB, tz: string, now: Date) {
-	const { ws, clamped } = await loadAll(db, now);
+export async function statsByDow(db: DB, userId: number, tz: string, now: Date) {
+	const { ws, clamped } = await loadAll(db, userId, now);
 	const labels = new Map(ws.map((w) => [w.id, watchLabel(w)]));
 	const acc = new Map<string, number>(); // `${dow}:${watchId}` -> minutes
 	for (const s of clamped)
@@ -90,8 +95,8 @@ export async function statsByDow(db: DB, tz: string, now: Date) {
 	});
 }
 
-export async function statsTodByWatch(db: DB, tz: string, now: Date) {
-	const { ws, clamped } = await loadAll(db, now);
+export async function statsTodByWatch(db: DB, userId: number, tz: string, now: Date) {
+	const { ws, clamped } = await loadAll(db, userId, now);
 	const labels = new Map(ws.map((w) => [w.id, watchLabel(w)]));
 	const acc = new Map<string, number>(); // `${hour}:${watchId}` -> minutes
 	for (const s of clamped)
@@ -105,8 +110,8 @@ export async function statsTodByWatch(db: DB, tz: string, now: Date) {
 	});
 }
 
-export async function statsByTod(db: DB, tz: string, now: Date) {
-	const { sessions, clamped } = await loadAll(db, now);
+export async function statsByTod(db: DB, userId: number, tz: string, now: Date) {
+	const { sessions, clamped } = await loadAll(db, userId, now);
 	const putOnByHour = Array(24).fill(0);
 	for (const s of sessions) putOnByHour[zonedParts(s.startedAt, tz).hour]++;
 
@@ -125,8 +130,8 @@ export async function statsByTod(db: DB, tz: string, now: Date) {
 	return { putOnByHour, wearingShareByHour };
 }
 
-export async function statsCalendar(db: DB, tz: string, year: number, now: Date) {
-	const { ws, clamped } = await loadAll(db, now);
+export async function statsCalendar(db: DB, userId: number, tz: string, year: number, now: Date) {
+	const { ws, clamped } = await loadAll(db, userId, now);
 	const labels = new Map(ws.map((w) => [w.id, watchLabel(w)]));
 	const byDay = new Map<string, Map<number, number>>(); // dayKey -> watchId -> minutes
 	for (const s of clamped)

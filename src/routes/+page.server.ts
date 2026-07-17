@@ -1,10 +1,9 @@
 import type { PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
-import { config } from '$lib/server/config';
 import { listWatchesWithMeta } from '$lib/server/watches';
 
-export const load: PageServerLoad = async () => {
-	const rows = await listWatchesWithMeta(await getDb(), config.homeTz, new Date());
+export const load: PageServerLoad = async ({ locals }) => {
+	const rows = await listWatchesWithMeta(await getDb(), locals.user!.id, locals.user!.homeTz, new Date());
 	return {
 		owned: rows.filter((r) => r.watch.status === 'owned'),
 		sold: rows.filter((r) => r.watch.status === 'sold')

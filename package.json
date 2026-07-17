@@ -31,6 +31,7 @@
 		"vitest": "^4.1.10"
 	},
 	"dependencies": {
+		"argon2": "^0.44.0",
 		"drizzle-orm": "^0.45.2",
 		"pg": "^8.22.0",
 		"sharp": "^0.35.3",

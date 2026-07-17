@@ -1,8 +1,17 @@
+import argon2 from 'argon2';
 import { Pool } from 'pg';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { createDb } from '../src/lib/server/db';
-import { watches } from '../src/lib/server/db/schema';
+import { users, watches } from '../src/lib/server/db/schema';
 import { createSession, putOn } from '../src/lib/server/sessions';
+
+// Not importing hashPassword from $lib/server/passwords here: that module
+// pulls in passwords-10k.txt via Vite's `?raw` import, which only Vite/vitest
+// know how to resolve. This script runs standalone via plain `tsx`, which
+// has no Vite transform pipeline, so `?raw` fails with ERR_UNKNOWN_FILE_EXTENSION.
+// Same argon2 params as passwords.ts's hashPassword — kept in sync manually.
+const hashPassword = (pw: string) =>
+	argon2.hash(pw, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
 
 const pool = new Pool({
 	connectionString: process.env.DATABASE_URL ?? 'postgres://onwrist:scratch@localhost:55432/onwrist'
@@ -15,6 +24,15 @@ if ((await db.select().from(watches)).length > 0) {
 	await pool.end();
 	process.exit(1);
 }
+
+const [seedUser] = await db
+	.insert(users)
+	.values({
+		email: 'seed@onwrist.local',
+		passwordHash: await hashPassword('seed-password-dev'),
+		emailVerifiedAt: new Date()
+	})
+	.returning();
 
 // Deterministic PRNG so reseeding is reproducible.
 function mulberry32(a: number) {
@@ -45,7 +63,7 @@ const COLLECTION = [
 
 const ids: number[] = [];
 for (const w of COLLECTION) {
-	ids.push((await db.insert(watches).values({ ...w }).returning())[0].id);
+	ids.push((await db.insert(watches).values({ ...w, userId: seedUser.id }).returning())[0].id);
 }
 
 // Favorites get worn more: weight by position (earlier = more worn).
@@ -73,17 +91,17 @@ for (let daysAgo = 120; daysAgo >= 1; daysAgo--) {
 		// midday swap: two back-to-back sessions
 		const mid = at(20, Math.floor(rand() * 60));
 		const end = at(29, Math.floor(rand() * 90)); // 9-10:30 PM Pacific
-		await createSession(db, { watchId, startedAt: start, endedAt: mid, note });
-		await createSession(db, {
+		await createSession(db, seedUser.id, { watchId, startedAt: start, endedAt: mid, note });
+		await createSession(db, seedUser.id, {
 			watchId: pick(weighted.filter((i) => i !== watchId)),
 			startedAt: mid,
 			endedAt: end
 		});
 	} else if (rand() < 0.04) {
 		// camping: worn overnight, off early next morning (before next day's ~6:30 AM start)
-		await createSession(db, { watchId, startedAt: start, endedAt: at(37, 0), note: 'camping' });
+		await createSession(db, seedUser.id, { watchId, startedAt: start, endedAt: at(37, 0), note: 'camping' });
 	} else {
-		await createSession(db, {
+		await createSession(db, seedUser.id, {
 			watchId,
 			startedAt: start,
 			endedAt: at(28, Math.floor(rand() * 150)),
@@ -94,7 +112,7 @@ for (let daysAgo = 120; daysAgo >= 1; daysAgo--) {
 }
 
 // Currently wearing something (put on this morning).
-await putOn(db, { watchId: ids[0], at: new Date(anchor.getTime() - 3 * 3_600_000), source: 'web' });
+await putOn(db, seedUser.id, { watchId: ids[0], at: new Date(anchor.getTime() - 3 * 3_600_000), source: 'web' });
 
 console.log(`Seeded ${ids.length} watches and ~${sessions} wear days (one session still open).`);
 await pool.end();
