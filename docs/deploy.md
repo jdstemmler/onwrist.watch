@@ -64,6 +64,7 @@ the production compose project and its persistent volumes.
   | `RESEND_API_KEY` | Resend API key for sending account emails. **Unset ⇒ emails are logged to stdout, not sent** — fine for a homelab box without outbound mail configured, but real users won't receive their verify/reset links until this is set. |
   | `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile bot check on signup. |
   | `POSTGRES_PASSWORD` | Postgres superuser password for the `db` service (required, no default). |
+  | `ADMIN_EMAIL` | Seeds one `admin`-role account at boot (`ensureAdmin()`, called from `getDb()`) if no admin exists yet — idempotent and safe to leave set permanently. The seeded account gets an unusable random password hash; there's no separate admin-invite step — the operator sets the real password by running the ordinary forgot-password flow (`/reset`) against `ADMIN_EMAIL`, same as any user. Unset ⇒ no admin is seeded and `/admin` is unreachable (404 for everyone). |
 
   Per-user preferences — home timezone and the stale-session-open nudge
   threshold — live on the `users` row and are edited on `/settings`; they are
@@ -73,12 +74,25 @@ the production compose project and its persistent volumes.
 
   `docker-compose.yml`'s `horolog` service `environment:` block forwards all
   of the above except `DATA_DIR` (left at its default): `MAIL_FROM`,
-  `RESEND_API_KEY`, `TURNSTILE_SITE_KEY`, and `TURNSTILE_SECRET_KEY` are
-  passed through with empty (`:-`) defaults, not `:?`-required, so the app
-  still boots without email/captcha configured — an empty `RESEND_API_KEY`
-  just falls back to logging account emails to stdout instead of sending
-  them, same as the scratch stack. Set the four in `.env` to actually send
-  mail and enforce the signup captcha in production.
+  `RESEND_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and
+  `ADMIN_EMAIL` are passed through with empty (`:-`) defaults, not
+  `:?`-required, so the app still boots without email/captcha/admin
+  configured — an empty `RESEND_API_KEY` just falls back to logging account
+  emails to stdout instead of sending them, same as the scratch stack, and
+  an empty `ADMIN_EMAIL` just means no admin gets seeded (`/admin` stays 404
+  for everyone). Set the four mail/captcha vars in `.env` to actually send
+  mail and enforce the signup captcha in production; set `ADMIN_EMAIL` to
+  get an admin console.
+
+  **First-boot admin:** setting `ADMIN_EMAIL` in `.env` before the first
+  `docker compose up` seeds one `admin`-role account at that address
+  (`ensureAdmin()`, called from `getDb()` on first DB access; idempotent —
+  it no-ops if an admin already exists, so it's safe to leave the var set
+  permanently). The seeded account has an unusable random password hash;
+  there's no separate admin-invite step. The operator sets the real
+  password by running the ordinary forgot-password flow at `/reset` against
+  `ADMIN_EMAIL`, same as any user would — check the container logs (or your
+  configured `RESEND_API_KEY` mailbox) for the reset link.
 
 Photos are stored on disk by the `PhotoStorage` fs driver
 (`src/lib/server/storage/fs.ts`) under `${DATA_DIR ?? './data'}/photos`,
