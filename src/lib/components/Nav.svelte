@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	let { appName, email = null }: { appName: string; email?: string | null } = $props();
+	let {
+		appName,
+		email = null,
+		isAdmin = false
+	}: { appName: string; email?: string | null; isAdmin?: boolean } = $props();
 
 	type Theme = 'auto' | 'light' | 'dark';
 	let theme = $state<Theme>('auto');
@@ -47,6 +51,15 @@
 	<button class="theme" onclick={cycleTheme} title="Theme: {theme}" aria-label="Theme: {theme}">
 		<span aria-hidden="true">{GLYPH[theme]}</span><span class="theme-label">{theme}</span>
 	</button>
+	{#if isAdmin}
+		<a
+			class="admin-link"
+			href="/admin"
+			aria-current={page.url.pathname === '/admin' ? 'page' : undefined}
+		>
+			Admin
+		</a>
+	{/if}
 	{#if email}
 		<a
 			class="gear"
@@ -140,6 +153,21 @@
 	.gear:hover,
 	.gear[aria-current='page'] {
 		color: var(--fg);
+	}
+
+	.admin-link {
+		font-family: var(--font-display);
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--fg-muted);
+		text-decoration: none;
+		padding: 0.25rem 0.35rem;
+	}
+	.admin-link:hover,
+	.admin-link[aria-current='page'] {
+		color: var(--navy);
 	}
 
 	.logout {

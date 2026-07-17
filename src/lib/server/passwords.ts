@@ -1,7 +1,4 @@
 import argon2 from 'argon2';
-import list from './passwords-10k.txt?raw';
-
-const COMMON = new Set(list.split('\n').map((l) => l.trim()).filter(Boolean));
 
 export function emailKey(raw: string): string {
 	return raw.trim().toLowerCase();
@@ -17,12 +14,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function emailFormatError(email: string): string | null {
 	const trimmed = email.trim();
 	if (!trimmed || /\s/.test(trimmed) || !EMAIL_RE.test(trimmed)) return 'Enter a valid email';
-	return null;
-}
-
-export function passwordPolicyError(pw: string): string | null {
-	if (pw.length < 10) return 'Password must be at least 10 characters';
-	if (COMMON.has(pw)) return 'That password is too common — pick something less guessable';
 	return null;
 }
 

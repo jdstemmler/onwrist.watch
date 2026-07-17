@@ -9,7 +9,8 @@ import {
 	accountExistsEmail
 } from './mail/templates';
 import { config } from './config';
-import { emailKey, emailFormatError, passwordPolicyError, hashPassword, verifyPasswordHash } from './passwords';
+import { emailKey, emailFormatError, hashPassword, verifyPasswordHash } from './passwords';
+import { passwordPolicyError } from './password-policy';
 import {
 	createUser,
 	findUserByEmail,

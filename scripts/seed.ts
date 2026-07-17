@@ -1,17 +1,9 @@
-import argon2 from 'argon2';
 import { Pool } from 'pg';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { createDb } from '../src/lib/server/db';
 import { users, watches } from '../src/lib/server/db/schema';
 import { createSession, putOn } from '../src/lib/server/sessions';
-
-// Not importing hashPassword from $lib/server/passwords here: that module
-// pulls in passwords-10k.txt via Vite's `?raw` import, which only Vite/vitest
-// know how to resolve. This script runs standalone via plain `tsx`, which
-// has no Vite transform pipeline, so `?raw` fails with ERR_UNKNOWN_FILE_EXTENSION.
-// Same argon2 params as passwords.ts's hashPassword — kept in sync manually.
-const hashPassword = (pw: string) =>
-	argon2.hash(pw, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
+import { hashPassword } from '../src/lib/server/passwords';
 
 const pool = new Pool({
 	connectionString: process.env.DATABASE_URL ?? 'postgres://onwrist:scratch@localhost:55432/onwrist'

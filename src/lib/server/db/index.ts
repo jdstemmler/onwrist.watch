@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import * as schema from './schema';
+import { ensureAdmin } from '../admin';
 
 export type DB = NodePgDatabase<typeof schema>;
 
@@ -11,6 +12,7 @@ export function createDb(client: Pool): DB {
 
 let _db: DB | undefined;
 let _migrated: Promise<void> | undefined;
+let _seeded: Promise<void> | undefined;
 
 export async function getDb(): Promise<DB> {
 	if (!_db) {
@@ -23,5 +25,10 @@ export async function getDb(): Promise<DB> {
 		throw e;
 	});
 	await _migrated;
+	_seeded ??= ensureAdmin(_db).catch((e) => {
+		_seeded = undefined;
+		throw e;
+	});
+	await _seeded;
 	return _db;
 }

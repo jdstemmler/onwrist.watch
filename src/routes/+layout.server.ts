@@ -10,6 +10,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		homeTz: locals.user?.homeTz ?? 'America/Los_Angeles',
 		appName: config.appName,
 		email: locals.user?.email ?? null,
-		verified: locals.user?.verified ?? true
+		verified: locals.user?.verified ?? true,
+		role: locals.user?.role ?? null
 	};
 };

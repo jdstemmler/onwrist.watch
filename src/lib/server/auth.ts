@@ -104,9 +104,11 @@ export function requireVerified(user: SessionUser): void {
 }
 
 /** Routing gate used by hooks.server.ts. Everything is protected except the
- * login/signup/verify/reset flows and the static assets they need. */
+ * public landing page, the login/signup/verify/reset flows, and the static
+ * assets they need. */
 export function routeClass(pathname: string): 'public' | 'protected' {
 	if (
+		pathname === '/' ||
 		pathname === '/login' ||
 		pathname === '/signup' ||
 		pathname === '/verify' ||
