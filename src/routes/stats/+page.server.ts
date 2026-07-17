@@ -2,12 +2,10 @@ import type { PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
 import { statsByDow, statsByTod, statsTodByWatch, statsByWatch, statsCalendar, statsSummary } from '$lib/server/stats';
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async ({ url, locals }) => {
 	const db = await getDb();
-	// Task 8 replaces with locals.user.homeTz
-	const tz = 'America/Los_Angeles';
-	// Task 8 replaces with locals.user.id
-	const uid = 1;
+	const tz = locals.user!.homeTz;
+	const uid = locals.user!.id;
 	const now = new Date();
 	const year = Number(url.searchParams.get('year') ?? now.getFullYear());
 	const [summary, byWatch, byDow, byTod, todByWatch, calendar] = await Promise.all([

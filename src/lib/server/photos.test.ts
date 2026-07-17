@@ -8,7 +8,7 @@ import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
 import { watchFormSchema, createWatch } from './watches';
 import { users, watchPhotos } from './db/schema';
-import { savePhoto, deletePhoto, setPrimaryPhoto } from './photos';
+import { savePhoto, deletePhoto, setPrimaryPhoto, getPhotoForUser } from './photos';
 import { createFsStorage } from './storage/fs';
 import type { PhotoStorage } from './storage';
 import { StateError } from './sessions';
@@ -133,6 +133,19 @@ describe('photos', () => {
 			const byId = new Map(rows.map((r) => [r.id, r]));
 			expect(byId.get(first.id)?.isPrimary).toBe(true);
 			expect(byId.get(second.id)?.isPrimary).toBe(false);
+		});
+	});
+
+	describe('getPhotoForUser', () => {
+		it('control-10: finds a photo by path only when it belongs to userId, else null', async () => {
+			const watch = await makeWatch(db, alice);
+			const photo = await savePhoto(db, alice, watch.id, await pngFile(64, 64), storage);
+
+			const found = await getPhotoForUser(db, alice, photo.filePath);
+			expect(found?.id).toBe(photo.id);
+
+			expect(await getPhotoForUser(db, mallory, photo.filePath)).toBeNull();
+			expect(await getPhotoForUser(db, alice, 'nonexistent/path.webp')).toBeNull();
 		});
 	});
 

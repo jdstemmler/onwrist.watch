@@ -4,6 +4,7 @@ import type { DB } from './db';
 import { authSessions, users } from './db/schema';
 import { hashToken } from './tokens';
 import { config } from './config';
+import { StateError } from './sessions';
 
 export const SESSION_COOKIE = 'wrist_session';
 
@@ -82,6 +83,14 @@ export async function revokeAllSessions(db: DB, userId: number): Promise<void> {
 
 export async function pruneSessions(db: DB, now = new Date()): Promise<void> {
 	await db.delete(authSessions).where(lt(authSessions.expiresAt, now));
+}
+
+/** Guards mutating actions: throws (403) unless the session user has
+ * verified their email. Call at the top of every mutating action. */
+export function requireVerified(user: SessionUser): void {
+	if (!user.verified) {
+		throw new StateError('Verify your email to make changes — check your inbox', 403);
+	}
 }
 
 /** Routing gate used by hooks.server.ts. Everything is protected except the

@@ -7,14 +7,8 @@ import { getState } from '$lib/server/state';
 import {
 	StateError, createSession, deleteSession, putOn, swap, takeOff, updateSession, watchLabel
 } from '$lib/server/sessions';
+import { requireVerified } from '$lib/server/auth';
 import { localInputToUtc, toLocalInput } from '$lib/server/time';
-
-// Task 8 replaces with locals.user.homeTz
-const HOME_TZ = 'America/Los_Angeles';
-// Task 8 replaces with locals.user.staleSessionHours
-const STALE_SESSION_HOURS = 24;
-// Task 8 replaces with locals.user.id
-const uid = 1;
 
 // Shown as the banner headline when nothing is on-wrist. Picked server-side
 // per page load so SSR and hydration agree. `{n}` = owned-watch count.
@@ -33,9 +27,11 @@ const EMPTY_WRIST_QUIPS = [
 	'The valet tray is fully staffed.'
 ];
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+	const uid = locals.user!.id;
+	const homeTz = locals.user!.homeTz;
 	const db = await getDb();
-	const state = await getState(db, uid, HOME_TZ);
+	const state = await getState(db, uid, homeTz);
 	const quip = EMPTY_WRIST_QUIPS[Math.floor(Math.random() * EMPTY_WRIST_QUIPS.length)].replace(
 		'{n}',
 		String(state.watches.length)
@@ -45,69 +41,77 @@ export const load: PageServerLoad = async () => {
 			.select({ session: wearSessions, watch: watches })
 			.from(wearSessions)
 			.innerJoin(watches, eq(wearSessions.watchId, watches.id))
+			.where(eq(watches.userId, uid))
 			.orderBy(desc(wearSessions.startedAt))
 			.limit(100)
 	).map(({ session, watch }) => ({
 			...session,
 			label: watchLabel(watch),
-			startedLocal: toLocalInput(session.startedAt, HOME_TZ),
-			endedLocal: session.endedAt ? toLocalInput(session.endedAt, HOME_TZ) : ''
+			startedLocal: toLocalInput(session.startedAt, homeTz),
+			endedLocal: session.endedAt ? toLocalInput(session.endedAt, homeTz) : ''
 		}));
 	const open = sessions.find((s) => s.endedAt === null);
 	const stale =
-		!!open && Date.now() - open.startedAt.getTime() > STALE_SESSION_HOURS * 3_600_000;
+		!!open && Date.now() - open.startedAt.getTime() > locals.user!.staleSessionHours * 3_600_000;
 	return { state, sessions, stale, quip, allWatches: state.wearing
 		? [...state.watches, { id: state.wearing.id, label: state.wearing.label }]
 		: state.watches };
 };
 
 const err = (e: unknown) =>
-	e instanceof StateError ? fail(409, { message: e.message }) : (() => { throw e; })();
+	e instanceof StateError ? fail(e.status, { message: e.message }) : (() => { throw e; })();
 
 export const actions: Actions = {
-	putOn: async ({ request }) => {
+	putOn: async ({ request, locals }) => {
 		const f = await request.formData();
 		try {
-			await putOn(await getDb(), uid, {
+			requireVerified(locals.user!);
+			await putOn(await getDb(), locals.user!.id, {
 				watchId: Number(f.get('watch_id')),
 				note: (f.get('note') as string) || undefined,
 				source: 'web'
 			});
 		} catch (e) { return err(e); }
 	},
-	swap: async ({ request }) => {
+	swap: async ({ request, locals }) => {
 		const f = await request.formData();
 		try {
-			await swap(await getDb(), uid, {
+			requireVerified(locals.user!);
+			await swap(await getDb(), locals.user!.id, {
 				watchId: Number(f.get('watch_id')),
 				note: (f.get('note') as string) || undefined,
 				source: 'web'
 			});
 		} catch (e) { return err(e); }
 	},
-	takeOff: async ({ request }) => {
+	takeOff: async ({ request, locals }) => {
 		const f = await request.formData();
 		try {
-			await takeOff(await getDb(), uid, { note: (f.get('note') as string) || undefined, source: 'web' });
+			requireVerified(locals.user!);
+			await takeOff(await getDb(), locals.user!.id, { note: (f.get('note') as string) || undefined, source: 'web' });
 		} catch (e) { return err(e); }
 	},
-	backfill: async ({ request }) => {
+	backfill: async ({ request, locals }) => {
 		const f = await request.formData();
+		const homeTz = locals.user!.homeTz;
 		try {
-			await createSession(await getDb(), uid, {
+			requireVerified(locals.user!);
+			await createSession(await getDb(), locals.user!.id, {
 				watchId: Number(f.get('watch_id')),
-				startedAt: localInputToUtc(f.get('started_at') as string, HOME_TZ),
+				startedAt: localInputToUtc(f.get('started_at') as string, homeTz),
 				endedAt: f.get('ended_at')
-					? localInputToUtc(f.get('ended_at') as string, HOME_TZ)
+					? localInputToUtc(f.get('ended_at') as string, homeTz)
 					: null,
 				note: (f.get('note') as string) || undefined,
 				source: 'backfill'
 			});
 		} catch (e) { return err(e); }
 	},
-	update: async ({ request }) => {
+	update: async ({ request, locals }) => {
 		const f = await request.formData();
+		const homeTz = locals.user!.homeTz;
 		try {
+			requireVerified(locals.user!);
 			// Only re-derive a timestamp the user actually edited. datetime-local
 			// strings are lossy during the DST fall-back hour (two distinct instants
 			// format identically — see localInputToUtc in $lib/server/time), so
@@ -121,24 +125,27 @@ export const actions: Actions = {
 			const startedAtOrig = f.get('started_at_orig') as string;
 			const endedAtRaw = (f.get('ended_at') as string) ?? '';
 			const endedAtOrig = (f.get('ended_at_orig') as string) ?? '';
-			await updateSession(await getDb(), uid, Number(f.get('id')), {
+			await updateSession(await getDb(), locals.user!.id, Number(f.get('id')), {
 				watchId: Number(f.get('watch_id')),
 				startedAt:
 					startedAtRaw === startedAtOrig
 						? undefined
-						: localInputToUtc(startedAtRaw, HOME_TZ),
+						: localInputToUtc(startedAtRaw, homeTz),
 				endedAt:
 					endedAtRaw === endedAtOrig
 						? undefined
 						: endedAtRaw
-							? localInputToUtc(endedAtRaw, HOME_TZ)
+							? localInputToUtc(endedAtRaw, homeTz)
 							: null,
 				note: (f.get('note') as string) || null
 			});
 		} catch (e) { return err(e); }
 	},
-	delete: async ({ request }) => {
+	delete: async ({ request, locals }) => {
 		const f = await request.formData();
-		await deleteSession(await getDb(), uid, Number(f.get('id')));
+		try {
+			requireVerified(locals.user!);
+			await deleteSession(await getDb(), locals.user!.id, Number(f.get('id')));
+		} catch (e) { return err(e); }
 	}
 };

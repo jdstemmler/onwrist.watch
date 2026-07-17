@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, getTableColumns } from 'drizzle-orm';
 import sharp from 'sharp';
 import type { DB } from './db';
 import { watches, watchPhotos, type WatchPhoto } from './db/schema';
@@ -92,6 +92,22 @@ export async function deletePhoto(
 	if (!p) return;
 	await storage.delete(p.filePath);
 	await db.delete(watchPhotos).where(eq(watchPhotos.id, photoId));
+}
+
+/** Looks up a photo by its storage path, scoped to `userId` via the
+ * owning watch. Used by the `/photos/[...path]` route so a signed-in user
+ * can never fetch another tenant's photo bytes by guessing/observing a
+ * storage key. */
+export async function getPhotoForUser(db: DB, userId: number, filePath: string): Promise<WatchPhoto | null> {
+	const row = (
+		await db
+			.select({ ...getTableColumns(watchPhotos) })
+			.from(watchPhotos)
+			.innerJoin(watches, eq(watches.id, watchPhotos.watchId))
+			.where(and(eq(watchPhotos.filePath, filePath), eq(watches.userId, userId)))
+			.limit(1)
+	)[0];
+	return row ?? null;
 }
 
 export async function setPrimaryPhoto(db: DB, userId: number, photoId: number): Promise<void> {

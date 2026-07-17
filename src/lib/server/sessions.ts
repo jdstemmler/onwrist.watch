@@ -3,7 +3,11 @@ import type { DB } from './db';
 import { users, watches, wearSessions, type WearSession } from './db/schema';
 
 export class StateError extends Error {
-	status = 409;
+	status: number;
+	constructor(message: string, status = 409) {
+		super(message);
+		this.status = status;
+	}
 }
 
 // Sentinel "end of time" so open sessions participate in overlap math.
