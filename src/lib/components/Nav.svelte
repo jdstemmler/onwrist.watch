@@ -59,6 +59,7 @@
 <nav>
 	<a class="brand" href="/" aria-label={appName}>
 		<img src="/icon-192.png" alt="" width="30" height="30" />
+		<span class="wordmark">{appName}</span>
 	</a>
 	<div class="links">
 		{#each links as l}
@@ -147,13 +148,31 @@
 
 	.brand {
 		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
 		margin-right: auto;
+		text-decoration: none;
 	}
 	.brand img {
 		display: block;
 		width: 30px;
 		height: 30px;
 		border-radius: 7px;
+	}
+	.wordmark {
+		font-family: var(--font-display);
+		font-size: 1.05rem;
+		font-weight: 600;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--fg);
+	}
+	/* Phones: logo only — the wordmark's width isn't worth it next to the
+	   section links; desktop/tablet keep the full brand. */
+	@media (max-width: 34rem) {
+		.wordmark {
+			display: none;
+		}
 	}
 
 	.links {
