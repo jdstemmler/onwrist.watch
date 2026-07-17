@@ -1,33 +1,75 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
 import type { DB } from './db';
-import { watchPhotos, type WatchPhoto } from './db/schema';
+import { watches, watchPhotos, type WatchPhoto } from './db/schema';
 import { getStorage, type PhotoStorage } from './storage';
 import { StateError } from './sessions';
+import { getUser } from './users';
+
+const PHOTOS_PER_WATCH = 12;
+const STORAGE_BYTES = 1_073_741_824;
 
 export function photoUrl(filePath: string): string {
 	return `/photos/${filePath}`;
 }
 
+/** Throws (also covers not-found) unless `watchId` belongs to `userId`. */
+async function assertWatchOwned(db: DB, userId: number, watchId: number) {
+	const row = (
+		await db
+			.select({ id: watches.id })
+			.from(watches)
+			.where(and(eq(watches.id, watchId), eq(watches.userId, userId)))
+			.limit(1)
+	)[0];
+	if (!row) throw new StateError("That watch isn't yours");
+}
+
 export async function savePhoto(
 	db: DB,
+	userId: number,
 	watchId: number,
 	file: File,
 	storage: PhotoStorage = getStorage()
 ): Promise<WatchPhoto> {
+	// Check order matters: ownership beats quota, quota only checked once we
+	// know we have real (decodable) image bytes to size.
+	await assertWatchOwned(db, userId, watchId);
+
 	if (!file.type.startsWith('image/')) {
 		throw new StateError(`Unsupported file type: ${file.type || 'unknown'}`);
 	}
-	const webp = await sharp(Buffer.from(await file.arrayBuffer()))
-		.rotate()
-		.resize(2000, 2000, { fit: 'inside', withoutEnlargement: true })
-		.webp({ quality: 80 })
-		.toBuffer();
-	const key = `${watchId}/${crypto.randomUUID()}.webp`;
+
+	let webp: Buffer;
+	try {
+		webp = await sharp(Buffer.from(await file.arrayBuffer()))
+			.rotate()
+			.resize(2000, 2000, { fit: 'inside', withoutEnlargement: true })
+			.webp({ quality: 80 })
+			.toBuffer();
+	} catch {
+		throw new StateError('Could not read that image — try a different photo');
+	}
+
+	const user = await getUser(db, userId);
+	const multiplier = user?.quotaMultiplier ?? 1;
+
+	const existingPhotos = await db
+		.select({ id: watchPhotos.id })
+		.from(watchPhotos)
+		.where(eq(watchPhotos.watchId, watchId));
+	if (existingPhotos.length >= PHOTOS_PER_WATCH * multiplier) {
+		throw new StateError('Photo limit reached (12 per watch) — delete some photos first');
+	}
+
+	const currentBytes = await storage.sizeOfPrefix(`${userId}/`);
+	if (webp.length + currentBytes > STORAGE_BYTES * multiplier) {
+		throw new StateError('Storage limit reached — delete some photos first');
+	}
+
+	const key = `${userId}/${watchId}/${crypto.randomUUID()}.webp`;
 	await storage.put(key, webp);
-	const isFirst = !(
-		await db.select().from(watchPhotos).where(eq(watchPhotos.watchId, watchId)).limit(1)
-	)[0];
+	const isFirst = existingPhotos.length === 0;
 	return (
 		await db.insert(watchPhotos).values({ watchId, filePath: key, isPrimary: isFirst }).returning()
 	)[0];
@@ -35,17 +77,32 @@ export async function savePhoto(
 
 export async function deletePhoto(
 	db: DB,
+	userId: number,
 	photoId: number,
 	storage: PhotoStorage = getStorage()
 ): Promise<void> {
-	const p = (await db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).limit(1))[0];
+	const p = (
+		await db
+			.select({ id: watchPhotos.id, filePath: watchPhotos.filePath, watchId: watchPhotos.watchId })
+			.from(watchPhotos)
+			.innerJoin(watches, eq(watches.id, watchPhotos.watchId))
+			.where(and(eq(watchPhotos.id, photoId), eq(watches.userId, userId)))
+			.limit(1)
+	)[0];
 	if (!p) return;
 	await storage.delete(p.filePath);
 	await db.delete(watchPhotos).where(eq(watchPhotos.id, photoId));
 }
 
-export async function setPrimaryPhoto(db: DB, photoId: number): Promise<void> {
-	const p = (await db.select().from(watchPhotos).where(eq(watchPhotos.id, photoId)).limit(1))[0];
+export async function setPrimaryPhoto(db: DB, userId: number, photoId: number): Promise<void> {
+	const p = (
+		await db
+			.select({ id: watchPhotos.id, watchId: watchPhotos.watchId })
+			.from(watchPhotos)
+			.innerJoin(watches, eq(watches.id, watchPhotos.watchId))
+			.where(and(eq(watchPhotos.id, photoId), eq(watches.userId, userId)))
+			.limit(1)
+	)[0];
 	if (!p) return;
 	await db.update(watchPhotos).set({ isPrimary: false }).where(eq(watchPhotos.watchId, p.watchId));
 	await db.update(watchPhotos).set({ isPrimary: true }).where(eq(watchPhotos.id, photoId));

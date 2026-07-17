@@ -8,6 +8,8 @@ import { photoUrl } from '$lib/server/photos';
 
 // Task 8 replaces with locals.user.homeTz
 const HOME_TZ = 'America/Los_Angeles';
+// Task 8 replaces with locals.user.id
+const uid = 1;
 
 export const load: PageServerLoad = async ({ params }) => {
 	const db = await getDb();
@@ -17,8 +19,8 @@ export const load: PageServerLoad = async ({ params }) => {
 	const now = new Date();
 	const [photos, statsRows, dowRows, sessions] = await Promise.all([
 		db.select().from(watchPhotos).where(eq(watchPhotos.watchId, id)),
-		statsByWatch(db, HOME_TZ, now),
-		statsByDow(db, HOME_TZ, now),
+		statsByWatch(db, uid, HOME_TZ, now),
+		statsByDow(db, uid, HOME_TZ, now),
 		db
 			.select()
 			.from(wearSessions)

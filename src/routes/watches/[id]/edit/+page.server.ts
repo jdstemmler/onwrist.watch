@@ -6,6 +6,9 @@ import { watches, watchPhotos } from '$lib/server/db/schema';
 import { watchFormSchema, updateWatch, deleteWatch } from '$lib/server/watches';
 import { savePhoto, deletePhoto, setPrimaryPhoto } from '$lib/server/photos';
 
+// Task 8 replaces with locals.user.id
+const uid = 1;
+
 function findWatch(db: DB, id: number) {
 	return db.select().from(watches).where(eq(watches.id, id)).limit(1).then((rows) => rows[0]);
 }
@@ -27,9 +30,9 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const parsed = watchFormSchema.safeParse(Object.fromEntries(form));
 		if (!parsed.success) return fail(400, { message: 'Check the highlighted fields' });
-		await updateWatch(db, id, parsed.data);
+		await updateWatch(db, uid, id, parsed.data);
 		const photo = form.get('photo');
-		if (photo instanceof File && photo.size > 0) await savePhoto(db, id, photo);
+		if (photo instanceof File && photo.size > 0) await savePhoto(db, uid, id, photo);
 		redirect(303, `/watches/${id}`);
 	},
 
@@ -39,7 +42,7 @@ export const actions: Actions = {
 		if (!(await findWatch(db, id))) return fail(404, { message: 'Watch not found' });
 		const form = await request.formData();
 		const photoId = Number(form.get('photoId'));
-		await deletePhoto(db, photoId);
+		await deletePhoto(db, uid, photoId);
 		return { success: true };
 	},
 
@@ -49,7 +52,7 @@ export const actions: Actions = {
 		if (!(await findWatch(db, id))) return fail(404, { message: 'Watch not found' });
 		const form = await request.formData();
 		const photoId = Number(form.get('photoId'));
-		await setPrimaryPhoto(db, photoId);
+		await setPrimaryPhoto(db, uid, photoId);
 		return { success: true };
 	},
 
@@ -57,7 +60,7 @@ export const actions: Actions = {
 		const id = Number(params.id);
 		const db = await getDb();
 		if (!(await findWatch(db, id))) return fail(404, { message: 'Watch not found' });
-		await deleteWatch(db, id);
+		await deleteWatch(db, uid, id);
 		redirect(303, `/`);
 	}
 };

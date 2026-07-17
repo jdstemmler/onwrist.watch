@@ -1,8 +1,12 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DB } from './db';
 import { watches, watchPhotos, type Watch } from './db/schema';
 import { statsByWatch, type WatchStats } from './stats';
+import { StateError } from './sessions';
+import { getUser } from './users';
+
+const WATCH_QUOTA = 20;
 
 const optStr = z.preprocess((v) => (v === '' || v == null ? null : v), z.string().nullable());
 const optNum = z.preprocess((v) => (v === '' || v == null ? null : Number(v)), z.number().nullable());
@@ -44,25 +48,47 @@ export const watchFormSchema = z
 
 export type WatchFormData = z.infer<typeof watchFormSchema>;
 
-export async function createWatch(db: DB, data: WatchFormData): Promise<Watch> {
-	// Task 6/7: take userId from the caller's session instead of hardcoding.
-	return (await db.insert(watches).values({ ...data, userId: 1 }).returning())[0];
+export async function createWatch(db: DB, userId: number, data: WatchFormData): Promise<Watch> {
+	const user = await getUser(db, userId);
+	const quota = WATCH_QUOTA * (user?.quotaMultiplier ?? 1);
+	const existing = (
+		await db.select({ id: watches.id }).from(watches).where(eq(watches.userId, userId))
+	).length;
+	if (existing >= quota) {
+		throw new StateError('Watch limit reached (20) — contact the admin if you need more');
+	}
+	return (await db.insert(watches).values({ ...data, userId }).returning())[0];
 }
 
-export async function updateWatch(db: DB, id: number, data: WatchFormData): Promise<Watch> {
-	return (
-		await db.update(watches).set({ ...data, updatedAt: new Date() }).where(eq(watches.id, id)).returning()
+export async function updateWatch(
+	db: DB,
+	userId: number,
+	id: number,
+	data: WatchFormData
+): Promise<Watch> {
+	const row = (
+		await db
+			.update(watches)
+			.set({ ...data, updatedAt: new Date() })
+			.where(and(eq(watches.id, id), eq(watches.userId, userId)))
+			.returning()
 	)[0];
+	if (!row) throw new StateError('Watch not found');
+	return row;
 }
 
-export async function deleteWatch(db: DB, id: number): Promise<void> {
-	await db.delete(watches).where(eq(watches.id, id));
+/** Cross-tenant calls are a silent no-op (the row just isn't in `userId`'s ownership scope). */
+export async function deleteWatch(db: DB, userId: number, id: number): Promise<void> {
+	await db.delete(watches).where(and(eq(watches.id, id), eq(watches.userId, userId)));
 }
 
-export async function listWatchesWithMeta(db: DB, tz: string, now: Date) {
-	const ws = await db.select().from(watches);
-	const photos = await db.select().from(watchPhotos);
-	const stats = new Map((await statsByWatch(db, tz, now)).map((s) => [s.watchId, s]));
+export async function listWatchesWithMeta(db: DB, userId: number, tz: string, now: Date) {
+	const ws = await db.select().from(watches).where(eq(watches.userId, userId));
+	const watchIds = ws.map((w) => w.id);
+	const photos = watchIds.length
+		? await db.select().from(watchPhotos).where(inArray(watchPhotos.watchId, watchIds))
+		: [];
+	const stats = new Map((await statsByWatch(db, userId, tz, now)).map((s) => [s.watchId, s]));
 	return ws.map((watch) => ({
 		watch,
 		primaryPhoto:
