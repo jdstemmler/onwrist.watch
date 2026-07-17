@@ -12,7 +12,8 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest run",
 		"db:generate": "drizzle-kit generate",
-		"seed": "tsx scripts/seed.ts"
+		"seed": "tsx scripts/seed.ts",
+		"migrate:legacy": "tsx scripts/migrate-legacy.ts"
 	},
 	"devDependencies": {
 		"@electric-sql/pglite": "^0.5.4",
