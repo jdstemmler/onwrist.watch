@@ -1,55 +1,34 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { page } from '$app/state';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-
-	const FLASH_MESSAGES: Record<string, string> = {
-		'password-updated': 'Password updated — log back in.'
-	};
-	const flash = $derived.by(() => {
-		const key = page.url.searchParams.get('flash');
-		return key ? FLASH_MESSAGES[key] : undefined;
-	});
 </script>
 
 <svelte:head>
-	<title>Wrist check — {data.appName}</title>
+	<title>New password — {data.appName}</title>
 </svelte:head>
 
 <div class="gate">
-	<form method="POST" action="?/login" use:enhance class="card">
-		<p class="kicker"><span class="dot"></span>Wrist check</p>
-		{#if flash}
-			<p class="success" role="status">{flash}</p>
-		{/if}
+	<form method="POST" use:enhance class="card">
+		<p class="kicker"><span class="dot"></span>New password</p>
 		{#if form?.message}
 			<p class="error" role="alert">{form.message}</p>
 		{/if}
-		<input type="hidden" name="next" value={data.next} />
+		<input type="hidden" name="token" value={data.token} />
 		<!-- svelte-ignore a11y_autofocus -->
-		<input
-			type="email"
-			name="email"
-			placeholder="email"
-			autocomplete="username"
-			aria-label="Email"
-			autofocus
-			required
-		/>
 		<input
 			type="password"
 			name="password"
-			placeholder="password"
-			autocomplete="current-password"
-			aria-label="Password"
+			placeholder="new password"
+			autocomplete="new-password"
+			aria-label="New password"
+			autofocus
 			required
 		/>
-		<button type="submit" class="primary">Unlock</button>
+		<button type="submit" class="primary">Set password</button>
 		<div class="links">
-			<a href="/reset">Forgot password?</a>
-			<a href="/signup">Create account</a>
+			<a href="/login">Back to login</a>
 		</div>
 	</form>
 </div>
@@ -109,17 +88,8 @@
 		margin: 0;
 	}
 
-	.success {
-		color: var(--accent);
-		font-size: 0.85rem;
-		margin: 0;
-	}
-
 	.links {
-		display: flex;
-		justify-content: space-between;
 		font-size: 0.8rem;
-		margin-top: 0.15rem;
 	}
 
 	.links a {

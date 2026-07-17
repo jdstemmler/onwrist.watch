@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	let { appName }: { appName: string } = $props();
+	let { appName, email = null }: { appName: string; email?: string | null } = $props();
 
 	type Theme = 'auto' | 'light' | 'dark';
 	let theme = $state<Theme>('auto');
@@ -47,6 +47,17 @@
 	<button class="theme" onclick={cycleTheme} title="Theme: {theme}" aria-label="Theme: {theme}">
 		<span aria-hidden="true">{GLYPH[theme]}</span><span class="theme-label">{theme}</span>
 	</button>
+	{#if email}
+		<a
+			class="gear"
+			href="/settings"
+			aria-current={page.url.pathname === '/settings' ? 'page' : undefined}
+			title="Settings"
+			aria-label="Settings"
+		>
+			&#9881;
+		</a>
+	{/if}
 	<form method="POST" action="/login?/logout" class="logout">
 		<button type="submit" title="Lock" aria-label="Lock">&#9919;</button>
 	</form>
@@ -116,6 +127,19 @@
 			font-size: 0.95rem;
 			padding: 0.15rem 0.25rem;
 		}
+	}
+
+	.gear {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.15rem 0.25rem;
+		font-size: 0.95rem;
+		color: var(--fg-muted);
+		text-decoration: none;
+	}
+	.gear:hover,
+	.gear[aria-current='page'] {
+		color: var(--fg);
 	}
 
 	.logout {
