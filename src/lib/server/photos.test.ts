@@ -156,10 +156,21 @@ describe('photos', () => {
 				await savePhoto(db, alice, watch.id, await pngFile(64, 64), storage);
 			}
 			await expect(savePhoto(db, alice, watch.id, await pngFile(64, 64), storage)).rejects.toThrow(
-				StateError
+				'Photo limit reached (12 per watch) — delete some photos first'
 			);
 			const rows = await db.select().from(watchPhotos).where(eq(watchPhotos.watchId, watch.id));
 			expect(rows).toHaveLength(12);
+		});
+
+		it('quotaMultiplier raises the per-watch photo quota, and the reject message reflects it', async () => {
+			await db.update(users).set({ quotaMultiplier: 2 }).where(eq(users.id, alice));
+			const watch = await makeWatch(db, alice);
+			for (let i = 0; i < 24; i++) {
+				await savePhoto(db, alice, watch.id, await pngFile(64, 64), storage);
+			}
+			await expect(savePhoto(db, alice, watch.id, await pngFile(64, 64), storage)).rejects.toThrow(
+				'Photo limit reached (24 per watch) — delete some photos first'
+			);
 		});
 
 		it('storage quota respects quotaMultiplier (allows at multiplier 2 what would fail at 1)', async () => {

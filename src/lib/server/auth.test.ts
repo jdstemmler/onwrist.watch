@@ -10,7 +10,9 @@ import {
 	revokeSession,
 	revokeAllSessions,
 	pruneSessions,
-	routeClass
+	routeClass,
+	shouldSlideCookie,
+	type SessionUser
 } from './auth';
 
 const HOUR = 3_600_000;
@@ -104,6 +106,30 @@ describe('sessions', () => {
 		expect(await validateSession(db, alive, at(2))).not.toBeNull();
 		expect(await validateSession(db, dead, at(2))).toBeNull();
 		expect(await db.select().from(authSessions)).toHaveLength(1);
+	});
+});
+
+describe('shouldSlideCookie', () => {
+	const member: SessionUser = {
+		id: 1,
+		email: 'a@b.com',
+		role: 'member',
+		homeTz: 'America/Los_Angeles',
+		staleSessionHours: 24,
+		verified: true
+	};
+	const admin: SessionUser = { ...member, role: 'admin' };
+
+	it('slides for a signed-in member', () => {
+		expect(shouldSlideCookie(member)).toBe(true);
+	});
+
+	it('never slides for admin (fixed 24h, matches validateSession)', () => {
+		expect(shouldSlideCookie(admin)).toBe(false);
+	});
+
+	it('does nothing when there is no user (unauthenticated)', () => {
+		expect(shouldSlideCookie(null)).toBe(false);
 	});
 });
 

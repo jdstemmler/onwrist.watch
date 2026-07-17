@@ -55,7 +55,7 @@ export async function createWatch(db: DB, userId: number, data: WatchFormData): 
 		await db.select({ id: watches.id }).from(watches).where(eq(watches.userId, userId))
 	).length;
 	if (existing >= quota) {
-		throw new StateError('Watch limit reached (20) — contact the admin if you need more');
+		throw new StateError(`Watch limit reached (${quota}) — contact the admin if you need more`);
 	}
 	return (await db.insert(watches).values({ ...data, userId }).returning())[0];
 }

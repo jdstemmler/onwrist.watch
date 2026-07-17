@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { DB } from './db';
-import { users, type User } from './db/schema';
+import { users, emailTokens, type User } from './db/schema';
 import { emailKey, passwordPolicyError, hashPassword } from './passwords';
 import { StateError } from './sessions';
 import { revokeAllSessions } from './auth';
@@ -40,8 +40,12 @@ export async function markVerified(db: DB, userId: number, now = new Date()): Pr
 	await db.update(users).set({ emailVerifiedAt: now }).where(eq(users.id, userId));
 }
 
-/** Re-hashes the password (policy-checked) and revokes every existing
- * session for the user — a password change ends all other logins. */
+/** Re-hashes the password (policy-checked), revokes every existing session
+ * for the user, and kills any outstanding email_change/reset tokens — a
+ * password change/reset must invalidate anything an attacker holding one of
+ * those tokens could still use (takeover-persistence). `verify` tokens are
+ * left alone: a legitimately-unverified user resetting their password should
+ * still be able to verify with the link already in their inbox. */
 export async function setPassword(db: DB, userId: number, password: string): Promise<void> {
 	const policyError = passwordPolicyError(password);
 	if (policyError) throw new StateError(policyError);
@@ -49,6 +53,9 @@ export async function setPassword(db: DB, userId: number, password: string): Pro
 	await db.transaction(async (tx) => {
 		await tx.update(users).set({ passwordHash }).where(eq(users.id, userId));
 		await revokeAllSessions(tx, userId);
+		await tx
+			.delete(emailTokens)
+			.where(and(eq(emailTokens.userId, userId), inArray(emailTokens.purpose, ['email_change', 'reset'])));
 	});
 }
 

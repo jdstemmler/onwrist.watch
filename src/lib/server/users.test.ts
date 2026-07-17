@@ -5,6 +5,7 @@ import { createTestDb } from './db/test-utils';
 import { users } from './db/schema';
 import { StateError } from './sessions';
 import { createSession, validateSession } from './auth';
+import { issueToken, consumeToken, TTL } from './tokens';
 import {
 	createUser,
 	findUserByEmail,
@@ -82,6 +83,19 @@ describe('setPassword', () => {
 	it('throws StateError on a weak new password', async () => {
 		const created = await createUser(db, 'a@b.com', 'correct-horse-battery');
 		await expect(setPassword(db, created.id, 'short')).rejects.toBeInstanceOf(StateError);
+	});
+
+	it('kills outstanding email_change/reset tokens but leaves verify tokens alone', async () => {
+		const created = await createUser(db, 'a@b.com', 'correct-horse-battery');
+		const changeToken = await issueToken(db, created.id, 'email_change', TTL.emailChange, 'new@b.com');
+		const resetToken = await issueToken(db, created.id, 'reset', TTL.reset);
+		const verifyToken = await issueToken(db, created.id, 'verify', TTL.verify);
+
+		await setPassword(db, created.id, 'a-new-good-password');
+
+		expect(await consumeToken(db, changeToken, 'email_change')).toBeNull();
+		expect(await consumeToken(db, resetToken, 'reset')).toBeNull();
+		expect((await consumeToken(db, verifyToken, 'verify'))?.userId).toBe(created.id);
 	});
 });
 

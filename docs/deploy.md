@@ -71,13 +71,14 @@ the production compose project and its persistent volumes.
   gone). There's likewise no `DASH_PASSWORD` — login is per-account
   email+password.
 
-  **Known gap:** `docker-compose.yml` on this branch still declares
-  `DASH_PASSWORD` (required, no default), `HOME_TZ`, and `STALE_SESSION_HOURS`
-  as container env — leftovers from before accounts landed that the app no
-  longer reads. `.env.example` was updated to the table above (it has no
-  `DASH_PASSWORD`), so the compose file and the example env are currently out
-  of sync; treat `docker-compose.yml`'s env block as needing a follow-up fix,
-  not as authoritative.
+  `docker-compose.yml`'s `horolog` service `environment:` block forwards all
+  of the above except `DATA_DIR` (left at its default): `MAIL_FROM`,
+  `RESEND_API_KEY`, `TURNSTILE_SITE_KEY`, and `TURNSTILE_SECRET_KEY` are
+  passed through with empty (`:-`) defaults, not `:?`-required, so the app
+  still boots without email/captcha configured — an empty `RESEND_API_KEY`
+  just falls back to logging account emails to stdout instead of sending
+  them, same as the scratch stack. Set the four in `.env` to actually send
+  mail and enforce the signup captcha in production.
 
 Photos are stored on disk by the `PhotoStorage` fs driver
 (`src/lib/server/storage/fs.ts`) under `${DATA_DIR ?? './data'}/photos`,
@@ -181,5 +182,4 @@ Plan C runs, **production stays on the pre-Plan-A image** (SQLite-backed),
 fully stopped, with its `data/` directory preserved as the rollback path.
 Nothing in this doc authorizes bringing up the Postgres-backed
 `docker-compose.yml` against real data — that only happens as part of Plan
-C's migration/cutover procedure (which will also need to fix the stale
-`DASH_PASSWORD`/`HOME_TZ`/`STALE_SESSION_HOURS` env block noted above).
+C's migration/cutover procedure.

@@ -58,8 +58,9 @@ export async function savePhoto(
 		.select({ id: watchPhotos.id })
 		.from(watchPhotos)
 		.where(eq(watchPhotos.watchId, watchId));
-	if (existingPhotos.length >= PHOTOS_PER_WATCH * multiplier) {
-		throw new StateError('Photo limit reached (12 per watch) — delete some photos first');
+	const photoQuota = PHOTOS_PER_WATCH * multiplier;
+	if (existingPhotos.length >= photoQuota) {
+		throw new StateError(`Photo limit reached (${photoQuota} per watch) — delete some photos first`);
 	}
 
 	const currentBytes = await storage.sizeOfPrefix(`${userId}/`);

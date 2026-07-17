@@ -91,7 +91,7 @@ describe('watch crud', () => {
 			).rejects.toThrow('Watch limit reached (20) — contact the admin if you need more');
 		});
 
-		it('quotaMultiplier raises the watch quota', async () => {
+		it('quotaMultiplier raises the watch quota, and the reject message reflects it', async () => {
 			await db.update(users).set({ quotaMultiplier: 2 }).where(eq(users.id, alice));
 			for (let i = 0; i < 20; i++) {
 				await createWatch(db, alice, watchFormSchema.parse({ brand: 'Brand', model: `M${i}`, status: 'owned' }));
@@ -99,6 +99,13 @@ describe('watch crud', () => {
 			// with multiplier 2, quota is 40 -- the 21st watch must succeed
 			const w = await createWatch(db, alice, watchFormSchema.parse({ brand: 'Brand', model: 'M21', status: 'owned' }));
 			expect(w.id).toBeDefined();
+
+			for (let i = 21; i < 40; i++) {
+				await createWatch(db, alice, watchFormSchema.parse({ brand: 'Brand', model: `M${i}`, status: 'owned' }));
+			}
+			await expect(
+				createWatch(db, alice, watchFormSchema.parse({ brand: 'Brand', model: 'M41', status: 'owned' }))
+			).rejects.toThrow('Watch limit reached (40) — contact the admin if you need more');
 		});
 
 		it("mallory's watches never count against alice's quota", async () => {

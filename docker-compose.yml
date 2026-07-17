@@ -27,6 +27,13 @@ services:
       # Must match the URL you load the dashboard from, or SvelteKit's CSRF
       # check rejects every form submission ("Cross-site POST ... forbidden").
       ORIGIN: ${ORIGIN:?set ORIGIN in .env}
+      # Account emails (verify/reset/change) and signup captcha. Left empty
+      # by default so the app still boots without mail/captcha configured —
+      # empty RESEND_API_KEY falls back to logging mail to stdout.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
     volumes:
       - ./data:/data
     depends_on:

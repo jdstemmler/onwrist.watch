@@ -73,6 +73,16 @@ export async function validateSession(
 	};
 }
 
+/** Whether `hooks.server.ts` should re-set the session cookie on this
+ * request so a rolling maxAge keeps sliding with activity. Mirrors
+ * validateSession's slide/no-slide split: members slide (DB row *and*
+ * cookie both need refreshing so the client doesn't get logged out from
+ * under an alive server-side session), admins are a fixed 24h and never
+ * slide either place. */
+export function shouldSlideCookie(user: SessionUser | null): boolean {
+	return user !== null && user.role === 'member';
+}
+
 export async function revokeSession(db: DB, token: string): Promise<void> {
 	await db.delete(authSessions).where(eq(authSessions.tokenHash, hashToken(token)));
 }
