@@ -10,9 +10,12 @@
 	);
 
 	const GATE_ROUTES = new Set(['/login', '/signup', '/verify', '/reset', '/reset/confirm']);
+	// The public landing view (logged-out '/') is a marketing page, not a
+	// signed-in surface — hide the app nav there too, same as the gate routes.
+	const isLandingRoute = $derived(page.route.id === '/' && !data.email);
 </script>
 
-{#if !GATE_ROUTES.has(page.route.id ?? '')}
+{#if !GATE_ROUTES.has(page.route.id ?? '') && !isLandingRoute}
 	<Nav appName={data.appName} email={data.email} isAdmin={data.role === 'admin'} />
 	{#if data.email && !data.verified}
 		<div class="unverified-banner">

@@ -145,7 +145,7 @@ describe('routeClass', () => {
 		['/icon-512.png', 'public'],
 		['/favicon.ico', 'public'],
 		['/_app/immutable/chunk.js', 'public'],
-		['/', 'protected'],
+		['/', 'public'],
 		['/log', 'protected'],
 		['/stats', 'protected'],
 		['/watches/3/edit', 'protected'],

@@ -1,57 +1,62 @@
 <script lang="ts">
+	import LandingHero from './LandingHero.svelte';
 	let { data } = $props();
 	const fmtDate = (iso: string | null) =>
 		iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'never';
 </script>
 
 <svelte:head>
-	<title>Collection — {data.appName}</title>
+	<title>{data.landing ? data.appName : `Collection — ${data.appName}`}</title>
 </svelte:head>
 
-<header class="row">
-	<h1>Collection</h1>
-	<a class="button primary" href="/watches/new">Add watch</a>
-</header>
-
-{#if data.owned.length === 0}
-	<div class="empty card">
-		<p>No watches yet.</p>
-		<a class="button primary" href="/watches/new">Add your first watch</a>
-	</div>
+{#if data.landing}
+	<LandingHero appName={data.appName} />
 {:else}
-	<div class="grid">
-		{#each data.owned as { watch, primaryPhoto, stats }}
-			<a class="card" href="/watches/{watch.id}">
-				<div class="photo">
-					{#if primaryPhoto}
-						<img src="/photos/{primaryPhoto}" alt={stats.label} loading="lazy" />
-					{:else}
-						<div class="ph" aria-hidden="true">
-							<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.4">
-								<circle cx="12" cy="12" r="7.25" />
-								<path d="M12 8.5V12l2.6 1.5" stroke-linecap="round" stroke-linejoin="round" />
-								<path d="M9.5 3.5h5M9.5 20.5h5" stroke-linecap="round" />
-							</svg>
-						</div>
-					{/if}
-				</div>
-				<h2>{stats.label}</h2>
-				<p class="sub">{watch.brand} {watch.model}{watch.referenceNo ? ` · ${watch.referenceNo}` : ''}</p>
-				<p class="meta num">{stats.wears} wears · {Math.round(stats.hours)}h · last worn {fmtDate(stats.lastWornAt)}</p>
-			</a>
-		{/each}
-	</div>
-{/if}
+	<header class="row">
+		<h1>Collection</h1>
+		<a class="button primary" href="/watches/new">Add watch</a>
+	</header>
 
-{#if data.sold.length}
-	<details class="sold">
-		<summary>Sold ({data.sold.length})</summary>
-		<ul>
-			{#each data.sold as { watch, stats }}
-				<li><a href="/watches/{watch.id}">{stats.label}</a> <span class="muted">— sold {watch.soldDate ?? ''}</span></li>
+	{#if data.owned.length === 0}
+		<div class="empty card">
+			<p>No watches yet.</p>
+			<a class="button primary" href="/watches/new">Add your first watch</a>
+		</div>
+	{:else}
+		<div class="grid">
+			{#each data.owned as { watch, primaryPhoto, stats }}
+				<a class="card" href="/watches/{watch.id}">
+					<div class="photo">
+						{#if primaryPhoto}
+							<img src="/photos/{primaryPhoto}" alt={stats.label} loading="lazy" />
+						{:else}
+							<div class="ph" aria-hidden="true">
+								<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.4">
+									<circle cx="12" cy="12" r="7.25" />
+									<path d="M12 8.5V12l2.6 1.5" stroke-linecap="round" stroke-linejoin="round" />
+									<path d="M9.5 3.5h5M9.5 20.5h5" stroke-linecap="round" />
+								</svg>
+							</div>
+						{/if}
+					</div>
+					<h2>{stats.label}</h2>
+					<p class="sub">{watch.brand} {watch.model}{watch.referenceNo ? ` · ${watch.referenceNo}` : ''}</p>
+					<p class="meta num">{stats.wears} wears · {Math.round(stats.hours)}h · last worn {fmtDate(stats.lastWornAt)}</p>
+				</a>
 			{/each}
-		</ul>
-	</details>
+		</div>
+	{/if}
+
+	{#if data.sold.length}
+		<details class="sold">
+			<summary>Sold ({data.sold.length})</summary>
+			<ul>
+				{#each data.sold as { watch, stats }}
+					<li><a href="/watches/{watch.id}">{stats.label}</a> <span class="muted">— sold {watch.soldDate ?? ''}</span></li>
+				{/each}
+			</ul>
+		</details>
+	{/if}
 {/if}
 
 <style>
