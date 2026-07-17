@@ -1,92 +1,101 @@
 import crypto from 'node:crypto';
 import { eq, lt } from 'drizzle-orm';
 import type { DB } from './db';
-import { authSessions } from './db/schema';
+import { authSessions, users } from './db/schema';
+import { hashToken } from './tokens';
+import { config } from './config';
 
 export const SESSION_COOKIE = 'wrist_session';
 
 const DAY = 86_400_000;
-const LOCKOUT_MS = 30_000;
-const MAX_FAILURES = 5;
 
-/** Constant-time password check. An empty configured password fails closed. */
-export function verifyPassword(supplied: string, configured: string): boolean {
-	if (!configured) return false;
-	// hash both sides so timingSafeEqual gets equal-length buffers
-	const a = crypto.createHash('sha256').update(supplied).digest();
-	const b = crypto.createHash('sha256').update(configured).digest();
-	return crypto.timingSafeEqual(a, b);
-}
+export type SessionUser = {
+	id: number;
+	email: string;
+	role: 'admin' | 'member';
+	homeTz: string;
+	staleSessionHours: number;
+	verified: boolean;
+};
 
-const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
-
-/** Creates a session row and returns the (unhashed) cookie token. */
-export async function createSession(db: DB, days: number, now = new Date()): Promise<string> {
+/** Creates a session row and returns the (unhashed) cookie token. Member
+ * sessions get `config.sessionDays` (sliding, see validateSession); admin
+ * sessions get a fixed 24h expiry that never slides. */
+export async function createSession(db: DB, userId: number, now = new Date()): Promise<string> {
+	const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+	const days = user?.role === 'admin' ? 1 : config.sessionDays;
 	const token = crypto.randomBytes(32).toString('base64url');
 	await db.insert(authSessions).values({
-		// Task 8 deletes wrist-check login
-		userId: 1,
+		userId,
 		tokenHash: hashToken(token),
 		expiresAt: new Date(now.getTime() + days * DAY)
 	});
 	return token;
 }
 
-/** True for a live session; renews the expiry once past its half-life. */
+/** Joins the session to its user in one query. Null if the token is
+ * missing/garbage, the session has expired, or the user is disabled.
+ * Renews (slides) the expiry for member sessions once past half-life of
+ * `config.sessionDays`; admin sessions (fixed 24h) never slide. */
 export async function validateSession(
 	db: DB,
 	token: string,
-	days: number,
 	now = new Date()
-): Promise<boolean> {
-	if (!token) return false;
-	const row = (
-		await db.select().from(authSessions).where(eq(authSessions.tokenHash, hashToken(token))).limit(1)
-	)[0] ?? null;
-	if (!row || row.expiresAt.getTime() <= now.getTime()) return false;
-	if (row.expiresAt.getTime() - now.getTime() < (days * DAY) / 2) {
+): Promise<SessionUser | null> {
+	if (!token) return null;
+	const rows = await db
+		.select({ s: authSessions, u: users })
+		.from(authSessions)
+		.innerJoin(users, eq(users.id, authSessions.userId))
+		.where(eq(authSessions.tokenHash, hashToken(token)))
+		.limit(1);
+	const row = rows[0];
+	if (!row) return null;
+	const { s, u } = row;
+	if (s.expiresAt.getTime() <= now.getTime()) return null;
+	if (u.disabledAt) return null;
+
+	if (u.role === 'member' && s.expiresAt.getTime() - now.getTime() < (config.sessionDays * DAY) / 2) {
 		await db
 			.update(authSessions)
-			.set({ expiresAt: new Date(now.getTime() + days * DAY) })
-			.where(eq(authSessions.id, row.id));
+			.set({ expiresAt: new Date(now.getTime() + config.sessionDays * DAY) })
+			.where(eq(authSessions.id, s.id));
 	}
-	return true;
+
+	return {
+		id: u.id,
+		email: u.email,
+		role: u.role,
+		homeTz: u.homeTz,
+		staleSessionHours: u.staleSessionHours,
+		verified: u.emailVerifiedAt !== null
+	};
 }
 
 export async function revokeSession(db: DB, token: string): Promise<void> {
 	await db.delete(authSessions).where(eq(authSessions.tokenHash, hashToken(token)));
 }
 
+export async function revokeAllSessions(db: DB, userId: number): Promise<void> {
+	await db.delete(authSessions).where(eq(authSessions.userId, userId));
+}
+
 export async function pruneSessions(db: DB, now = new Date()): Promise<void> {
 	await db.delete(authSessions).where(lt(authSessions.expiresAt, now));
 }
 
-/* In-memory login throttle: global (single-user app, single process).
-   Five consecutive failures lock the login form for 30 seconds. */
-let failures = 0;
-let lockedUntil = 0;
-
-export function loginLockedMs(now = Date.now()): number {
-	return Math.max(0, lockedUntil - now);
-}
-
-export function recordLoginFailure(now = Date.now()): void {
-	failures += 1;
-	if (failures >= MAX_FAILURES) {
-		lockedUntil = now + LOCKOUT_MS;
-		failures = 0;
-	}
-}
-
-export function recordLoginSuccess(): void {
-	failures = 0;
-	lockedUntil = 0;
-}
-
 /** Routing gate used by hooks.server.ts. Everything is protected except the
- * login page and the static assets the login page itself needs. */
+ * login/signup/verify/reset flows and the static assets they need. */
 export function routeClass(pathname: string): 'public' | 'protected' {
-	if (pathname === '/login' || pathname === '/manifest.webmanifest' || pathname === '/favicon.ico')
+	if (
+		pathname === '/login' ||
+		pathname === '/signup' ||
+		pathname === '/verify' ||
+		pathname === '/reset' ||
+		pathname === '/reset/confirm' ||
+		pathname === '/manifest.webmanifest' ||
+		pathname === '/favicon.ico'
+	)
 		return 'public';
 	if (pathname.startsWith('/_app/') || pathname.startsWith('/icon-')) return 'public';
 	return 'protected';

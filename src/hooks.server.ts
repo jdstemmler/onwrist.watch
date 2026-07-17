@@ -1,6 +1,5 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { SESSION_COOKIE, routeClass, validateSession } from '$lib/server/auth';
-import { config } from '$lib/server/config';
 import { getDb } from '$lib/server/db';
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -8,7 +7,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (routeClass(pathname) === 'public') return resolve(event);
 
 	const token = event.cookies.get(SESSION_COOKIE) ?? '';
-	const ok = token && (await validateSession(await getDb(), token, config.sessionDays));
+	const user = token ? await validateSession(await getDb(), token) : null; // Task 8 populates locals.user
+	const ok = !!user;
 	if (!ok) {
 		const next = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname + search)}`;
 		redirect(303, `/login${next}`);
