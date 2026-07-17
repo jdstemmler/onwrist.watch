@@ -1,6 +1,9 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { SESSION_COOKIE, routeClass, validateSession } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
+import { assertConfig } from '$lib/server/config';
+
+assertConfig();
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname, search } = event.url;

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
@@ -6,6 +6,8 @@ import { users } from './db/schema';
 import { createFakeMailer } from './mail/fake';
 import type { Mail } from './mail/index';
 import { createUser, getUser } from './users';
+import * as usersModule from './users';
+import * as passwordsModule from './passwords';
 import { validateSession } from './auth';
 import { config } from './config';
 import { LIMITS } from './rate-limit';
@@ -17,6 +19,7 @@ import {
 	confirmReset,
 	requestEmailChange,
 	resendVerification,
+	changePassword,
 	sessionCookieOptions,
 	type FlowDeps,
 	type CaptchaDeps
@@ -125,6 +128,66 @@ describe('signup', () => {
 			'9.9.9.9'
 		);
 		expect(result).toEqual({ ok: false, status: 429, message: expect.any(String) });
+	});
+
+	it('rejects a malformed email with a plain validation failure, before captcha or password checks', async () => {
+		const result = await signup(
+			captchaDeps,
+			{ email: 'not-an-email', password: 'a-correct-password1', captchaToken: 'tok' },
+			'1.1.1.9'
+		);
+		expect(result).toEqual({ ok: false, status: 400, message: expect.any(String) });
+		expect(mailer.sent).toHaveLength(0);
+	});
+
+	it('timing oracle: the existing-email branch pays the same argon2 cost as the new-account branch', async () => {
+		const spy = vi.spyOn(passwordsModule, 'verifyPasswordHash');
+		await createUser(db, 'timing@b.com', 'a-correct-password1');
+
+		const result = await signup(
+			captchaDeps,
+			{ email: 'timing@b.com', password: 'a-correct-password1', captchaToken: 'tok' },
+			'1.1.1.10'
+		);
+		expect(result).toEqual({ ok: true, sent: true });
+		expect(spy).toHaveBeenCalledTimes(1);
+		spy.mockRestore();
+	});
+
+	it('TOCTOU: a duplicate insert raced past the existence check still returns uniform success, not a throw', async () => {
+		const spy = vi.spyOn(passwordsModule, 'verifyPasswordHash');
+		const findSpy = vi.spyOn(usersModule, 'findUserByEmail').mockResolvedValueOnce(null);
+		await createUser(db, 'raced@b.com', 'a-correct-password1');
+
+		const result = await signup(
+			captchaDeps,
+			{ email: 'raced@b.com', password: 'a-correct-password1', captchaToken: 'tok' },
+			'1.1.1.11'
+		);
+
+		expect(result).toEqual({ ok: true, sent: true });
+		// the raced branch pays the same hashing cost as the direct existing-email branch
+		expect(spy).toHaveBeenCalledTimes(1);
+		findSpy.mockRestore();
+		spy.mockRestore();
+	});
+
+	it('a non-unique-violation error from createUser still propagates (not swallowed as a false "existing" outcome)', async () => {
+		const findSpy = vi.spyOn(usersModule, 'findUserByEmail').mockResolvedValueOnce(null);
+		const createSpy = vi
+			.spyOn(usersModule, 'createUser')
+			.mockRejectedValueOnce(new Error('unrelated db failure'));
+
+		await expect(
+			signup(
+				captchaDeps,
+				{ email: 'boom@b.com', password: 'a-correct-password1', captchaToken: 'tok' },
+				'1.1.1.12'
+			)
+		).rejects.toThrow('unrelated db failure');
+
+		findSpy.mockRestore();
+		createSpy.mockRestore();
 	});
 });
 
@@ -236,13 +299,43 @@ describe('login', () => {
 		const result = await login(deps, { email: 'a@b.com', password: 'a-correct-password1' }, '5.5.5.99');
 		expect(result).toEqual({ ok: false, status: 429, message: expect.any(String) });
 	});
+
+	it('failure-only counting: 10 failed attempts lock the account, even from a fresh IP', async () => {
+		for (let i = 0; i < LIMITS.loginAccount.max; i++) {
+			const r = await login(deps, { email: 'a@b.com', password: 'wrong' }, `5.6.6.${i}`);
+			expect(r).toEqual({ ok: false, status: 401, message: 'Email or password is wrong' });
+		}
+		const locked = await login(deps, { email: 'a@b.com', password: 'a-correct-password1' }, '5.6.6.99');
+		expect(locked).toEqual({ ok: false, status: 429, message: expect.any(String) });
+	});
+
+	it('a successful login does NOT consume a rate-limit slot', async () => {
+		// Far more successes than the account limit's max — if success
+		// consumed a slot, this would start returning 429 well before the
+		// loop ends.
+		for (let i = 0; i < LIMITS.loginAccount.max + 5; i++) {
+			const result = await login(deps, { email: 'a@b.com', password: 'a-correct-password1' }, '5.7.7.1');
+			expect(result.ok).toBe(true);
+		}
+	});
+
+	it('over-limit path returns the same uniform failure shape as a wrong password, not a distinct 429 body', async () => {
+		for (let i = 0; i < LIMITS.loginAccount.max; i++) {
+			await login(deps, { email: 'a@b.com', password: 'wrong' }, `5.8.8.${i}`);
+		}
+		const overLimit = await login(deps, { email: 'a@b.com', password: 'a-correct-password1' }, '5.8.8.99');
+		expect(overLimit.ok).toBe(false);
+		if (overLimit.ok) throw new Error('unreachable');
+		expect(overLimit.status).toBe(429);
+		expect(overLimit.message).toBe('Too many attempts — try again later');
+	});
 });
 
 describe('reset', () => {
 	it('control-4b: response identical for existing and unknown accounts', async () => {
 		await createUser(db, 'known@b.com', 'a-correct-password1');
-		const rKnown = await requestReset(deps, { email: 'known@b.com' });
-		const rUnknown = await requestReset(deps, { email: 'unknown@b.com' });
+		const rKnown = await requestReset(deps, { email: 'known@b.com' }, '8.1.1.1');
+		const rUnknown = await requestReset(deps, { email: 'unknown@b.com' }, '8.1.1.2');
 		expect(rKnown).toEqual(rUnknown);
 		expect(rKnown).toEqual({ ok: true, sent: true });
 		expect(mailer.sent).toHaveLength(1); // only the known account actually gets mail
@@ -251,10 +344,26 @@ describe('reset', () => {
 	it('rate-limits per account with a 429', async () => {
 		await createUser(db, 'a@b.com', 'a-correct-password1');
 		for (let i = 0; i < LIMITS.resetAccount.max; i++) {
-			await requestReset(deps, { email: 'a@b.com' });
+			await requestReset(deps, { email: 'a@b.com' }, '8.2.2.2');
 		}
-		const result = await requestReset(deps, { email: 'a@b.com' });
+		const result = await requestReset(deps, { email: 'a@b.com' }, '8.2.2.2');
 		expect(result).toEqual({ ok: false, status: 429, message: expect.any(String) });
+	});
+
+	it('rate-limits per IP with a 429, independent of which account is targeted', async () => {
+		await createUser(db, 'a@b.com', 'a-correct-password1');
+		await createUser(db, 'b@b.com', 'a-correct-password1');
+		for (let i = 0; i < LIMITS.resetIp.max; i++) {
+			await requestReset(deps, { email: `distinct${i}@b.com` }, '8.3.3.3');
+		}
+		const result = await requestReset(deps, { email: 'a@b.com' }, '8.3.3.3');
+		expect(result).toEqual({ ok: false, status: 429, message: expect.any(String) });
+	});
+
+	it('rejects a malformed email with a plain validation failure (not an enumeration channel)', async () => {
+		const result = await requestReset(deps, { email: 'not-an-email' }, '8.4.4.4');
+		expect(result).toEqual({ ok: false, status: 400, message: expect.any(String) });
+		expect(mailer.sent).toHaveLength(0);
 	});
 
 	it('roundtrip: request -> confirm sets the new password and revokes sessions', async () => {
@@ -262,7 +371,7 @@ describe('reset', () => {
 		const { createSession } = await import('./auth');
 		const oldSession = await createSession(db, user.id, T0);
 
-		await requestReset(deps, { email: 'a@b.com' });
+		await requestReset(deps, { email: 'a@b.com' }, '6.6.6.1');
 		const token = extractToken(mailer.sent.at(-1)!);
 
 		const result = await confirmReset(deps, { token, password: 'the-new-password1' });
@@ -340,6 +449,27 @@ describe('change-email', () => {
 		const result = await requestEmailChange(deps, user.id, 'a-correct-password1', 'overflow@b.com');
 		expect(result).toEqual({ ok: false, status: 429, message: expect.any(String) });
 	});
+
+	it('rejects a malformed new-email address with a validation failure', async () => {
+		const user = await createUser(db, 'old@b.com', 'a-correct-password1');
+		const result = await requestEmailChange(deps, user.id, 'a-correct-password1', 'not-an-email');
+		expect(result).toEqual({ ok: false, status: 400, message: expect.any(String) });
+		expect(mailer.sent).toHaveLength(0);
+	});
+
+	it('TOCTOU: an address claimed by someone else between request and click fails uniformly, not a verify-page throw', async () => {
+		const user = await createUser(db, 'old@b.com', 'a-correct-password1');
+		const changeResult = await requestEmailChange(deps, user.id, 'a-correct-password1', 'raced@b.com');
+		expect(changeResult).toEqual({ ok: true, sent: true });
+		const token = extractToken(mailer.sent.at(-1)!);
+
+		// Someone else grabs the address before the original clicks the link.
+		await createUser(db, 'raced@b.com', 'another-correct-pw1');
+
+		const result = await verify(deps, token);
+		expect(result).toEqual({ ok: false, message: expect.any(String) });
+		expect((await getUser(db, user.id))?.email).toBe('old@b.com'); // unchanged
+	});
 });
 
 describe('resendVerification', () => {
@@ -357,6 +487,53 @@ describe('resendVerification', () => {
 		const result = await resendVerification(deps, user.id);
 		expect(result).toEqual({ ok: true, sent: true });
 		expect(mailer.sent).toHaveLength(0);
+	});
+});
+
+describe('changePassword', () => {
+	it('roundtrip: sets the new password and revokes every session for the account', async () => {
+		const user = await createUser(db, 'a@b.com', 'the-old-password1');
+		const { createSession } = await import('./auth');
+		const oldSession = await createSession(db, user.id, T0);
+
+		const result = await changePassword(deps, user.id, 'the-old-password1', 'the-new-password1');
+		expect(result).toEqual({ ok: true });
+		expect(await validateSession(db, oldSession, T0)).toBeNull();
+
+		const loginResult = await login(deps, { email: 'a@b.com', password: 'the-new-password1' }, '9.1.1.1');
+		expect(loginResult.ok).toBe(true);
+	});
+
+	it('rejects a wrong current password without touching the stored hash', async () => {
+		const user = await createUser(db, 'a@b.com', 'the-old-password1');
+		const result = await changePassword(deps, user.id, 'totally-wrong', 'the-new-password1');
+		expect(result).toEqual({ ok: false, status: 401, message: expect.any(String) });
+
+		const loginResult = await login(deps, { email: 'a@b.com', password: 'the-old-password1' }, '9.1.1.2');
+		expect(loginResult.ok).toBe(true);
+	});
+
+	it('rejects a weak new password (StateError from the shared policy check in setPassword)', async () => {
+		const user = await createUser(db, 'a@b.com', 'the-old-password1');
+		const result = await changePassword(deps, user.id, 'the-old-password1', 'short');
+		expect(result.ok).toBe(false);
+		if (result.ok) throw new Error('unreachable');
+		expect(result.message).toMatch(/10/);
+	});
+
+	it('rate-limits attempts per account with a 429, protecting the current-password re-verify from brute force', async () => {
+		const user = await createUser(db, 'a@b.com', 'the-old-password1');
+		for (let i = 0; i < LIMITS.passwordChange.max; i++) {
+			const r = await changePassword(deps, user.id, 'totally-wrong', 'the-new-password1');
+			expect(r).toEqual({ ok: false, status: 401, message: expect.any(String) });
+		}
+		const overLimit = await changePassword(deps, user.id, 'the-old-password1', 'the-new-password1');
+		expect(overLimit).toEqual({ ok: false, status: 429, message: expect.any(String) });
+
+		// the correct password still works — confirms the limit blocked the
+		// attempt rather than the password actually having changed
+		const loginResult = await login(deps, { email: 'a@b.com', password: 'the-old-password1' }, '9.1.1.3');
+		expect(loginResult.ok).toBe(true);
 	});
 });
 

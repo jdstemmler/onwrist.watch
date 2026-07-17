@@ -9,11 +9,29 @@ import {
 	accountExistsEmail
 } from './mail/templates';
 import { config } from './config';
-import { emailKey, passwordPolicyError, hashPassword, verifyPasswordHash } from './passwords';
-import { createUser, findUserByEmail, getUser, markVerified, setPassword, applyEmailChange } from './users';
+import { emailKey, emailFormatError, passwordPolicyError, hashPassword, verifyPasswordHash } from './passwords';
+import {
+	createUser,
+	findUserByEmail,
+	getUser,
+	markVerified,
+	setPassword,
+	applyEmailChange,
+	isUniqueViolation
+} from './users';
 import { issueToken, consumeToken, TTL } from './tokens';
 import { createSession, revokeSession } from './auth';
-import { rateLimit } from './rate-limit';
+import { rateLimit, rateLimitCheck } from './rate-limit';
+import { StateError } from './sessions';
+
+/** Fire-and-forget send for the network leg of a user-facing flow: never
+ * awaited, so its latency can't become a timing oracle for anything the
+ * caller branched on (account existence, email availability, ...). The fake
+ * mailer used in tests records synchronously before its promise settles, so
+ * `mailer.sent` assertions still see it immediately after the flow returns. */
+function sendAsync(mailer: Mailer, mail: Parameters<Mailer['send']>[0]): void {
+	mailer.send(mail).catch((e) => console.error('mail send failed', e));
+}
 
 export type FlowDeps = { db: DB; mailer: Mailer; now?: Date };
 export type CaptchaDeps = FlowDeps & {
@@ -59,6 +77,8 @@ export async function signup(
 	if (!(await rateLimit(db, 'signupIp', `signup:ip:${ip}`, now))) {
 		return { ok: false, status: 429, message: RATE_LIMIT_MESSAGE };
 	}
+	const formatError = emailFormatError(input.email);
+	if (formatError) return { ok: false, status: 400, message: formatError };
 	if (!(await verifyCaptcha(input.captchaToken, ip))) {
 		return { ok: false, status: 400, message: 'Captcha failed — try again' };
 	}
@@ -67,11 +87,24 @@ export async function signup(
 
 	const existing = await findUserByEmail(db, input.email);
 	if (existing) {
-		await mailer.send(accountExistsEmail(existing.email));
+		// Pay the same argon2 cost the "new account" branch pays via
+		// hashPassword — otherwise the awaited-hash time itself becomes an
+		// enumeration signal even with the network send made fire-and-forget.
+		await verifyPasswordHash(await getDummyHash(), input.password);
+		sendAsync(mailer, accountExistsEmail(existing.email));
 	} else {
-		const user = await createUser(db, input.email, input.password);
-		const token = await issueToken(db, user.id, 'verify', TTL.verify, undefined, now);
-		await mailer.send(verifyEmail(user.email, token));
+		try {
+			const user = await createUser(db, input.email, input.password);
+			const token = await issueToken(db, user.id, 'verify', TTL.verify, undefined, now);
+			sendAsync(mailer, verifyEmail(user.email, token));
+		} catch (e) {
+			if (!isUniqueViolation(e)) throw e;
+			// TOCTOU: another request created this email between our
+			// existence check and this insert. Same uniform outcome as the
+			// existing-email branch above — never a 500.
+			await verifyPasswordHash(await getDummyHash(), input.password);
+			sendAsync(mailer, accountExistsEmail(emailKey(input.email)));
+		}
 	}
 	return { ok: true, sent: true };
 }
@@ -91,8 +124,17 @@ export async function verify(deps: FlowDeps, token: string): Promise<{ ok: true 
 	const changeRow = await consumeToken(db, token, 'email_change', now);
 	if (changeRow) {
 		const oldUser = await getUser(db, changeRow.userId);
-		await applyEmailChange(db, changeRow.userId, changeRow.newEmail!, now);
-		if (oldUser) await mailer.send(emailChangedNotice(oldUser.email));
+		try {
+			await applyEmailChange(db, changeRow.userId, changeRow.newEmail!, now);
+		} catch (e) {
+			if (!isUniqueViolation(e)) throw e;
+			// TOCTOU: someone else claimed this address between the
+			// change-request and now clicking the link. The token is already
+			// consumed (single-use); fold this into the generic bad-token
+			// failure rather than a verify-page 500.
+			return { ok: false, message: BAD_TOKEN_MESSAGE };
+		}
+		if (oldUser) sendAsync(mailer, emailChangedNotice(oldUser.email));
 		return { ok: true };
 	}
 
@@ -112,10 +154,15 @@ export async function login(
 	| FlowError
 > {
 	const { db, now } = deps;
+	const ipKey = `login:ip:${ip}`;
+	const acctKey = `login:acct:${emailKey(input.email)}`;
 
-	const ipOk = await rateLimit(db, 'loginIp', `login:ip:${ip}`, now);
-	const acctOk = await rateLimit(db, 'loginAccount', `login:acct:${emailKey(input.email)}`, now);
-	if (!ipOk || !acctOk) {
+	// Read-only: don't consume a slot just for showing up. Only a FAILED
+	// attempt burns one below — otherwise a legitimate user's own successful
+	// logins would eventually lock them out, and an attacker could burn a
+	// victim's login budget by triggering successes (there are none to
+	// trigger, but the asymmetry is the point).
+	if (!(await rateLimitCheck(db, 'loginIp', ipKey, now)) || !(await rateLimitCheck(db, 'loginAccount', acctKey, now))) {
 		return { ok: false, status: 429, message: RATE_LIMIT_MESSAGE };
 	}
 
@@ -124,6 +171,8 @@ export async function login(
 	const passwordOk = await verifyPasswordHash(hashToCheck, input.password);
 
 	if (!user || !passwordOk || user.disabledAt) {
+		await rateLimit(db, 'loginIp', ipKey, now);
+		await rateLimit(db, 'loginAccount', acctKey, now);
 		return { ok: false, status: 401, message: LOGIN_FAIL_MESSAGE };
 	}
 
@@ -141,10 +190,16 @@ export async function login(
 /** Reset request: uniform response regardless of account existence. */
 export async function requestReset(
 	deps: FlowDeps,
-	input: { email: string }
+	input: { email: string },
+	ip: string
 ): Promise<{ ok: true; sent: true } | FlowError> {
 	const { db, mailer, now } = deps;
 
+	if (!(await rateLimit(db, 'resetIp', `reset:ip:${ip}`, now))) {
+		return { ok: false, status: 429, message: RATE_LIMIT_MESSAGE };
+	}
+	const formatError = emailFormatError(input.email);
+	if (formatError) return { ok: false, status: 400, message: formatError };
 	if (!(await rateLimit(db, 'resetAccount', `reset:acct:${emailKey(input.email)}`, now))) {
 		return { ok: false, status: 429, message: RATE_LIMIT_MESSAGE };
 	}
@@ -152,7 +207,7 @@ export async function requestReset(
 	const user = await findUserByEmail(db, input.email);
 	if (user) {
 		const token = await issueToken(db, user.id, 'reset', TTL.reset, undefined, now);
-		await mailer.send(resetEmail(user.email, token));
+		sendAsync(mailer, resetEmail(user.email, token));
 	}
 	return { ok: true, sent: true };
 }
@@ -197,13 +252,16 @@ export async function requestEmailChange(
 		return { ok: false, status: 401, message: 'Current password is wrong' };
 	}
 
+	const formatError = emailFormatError(newEmail);
+	if (formatError) return { ok: false, status: 400, message: formatError };
+
 	const normalizedNew = emailKey(newEmail);
 	const existing = await findUserByEmail(db, normalizedNew);
 	if (existing) {
-		await mailer.send(accountExistsEmail(existing.email));
+		sendAsync(mailer, accountExistsEmail(existing.email));
 	} else {
 		const token = await issueToken(db, userId, 'email_change', TTL.emailChange, normalizedNew, now);
-		await mailer.send(emailChangeVerify(normalizedNew, token));
+		sendAsync(mailer, emailChangeVerify(normalizedNew, token));
 	}
 	return { ok: true, sent: true };
 }
@@ -224,7 +282,37 @@ export async function resendVerification(
 	const user = await getUser(db, userId);
 	if (user && !user.emailVerifiedAt) {
 		const token = await issueToken(db, userId, 'verify', TTL.verify, undefined, now);
-		await mailer.send(verifyEmail(user.email, token));
+		sendAsync(mailer, verifyEmail(user.email, token));
 	}
 	return { ok: true, sent: true };
+}
+
+/** Password change (settings): rate-limited per account, requires
+ * re-verifying the current password before touching it. setPassword revokes
+ * every other session for the account on success — the caller (the settings
+ * route) clears the current cookie and bounces to /login. */
+export async function changePassword(
+	deps: FlowDeps,
+	userId: number,
+	currentPassword: string,
+	newPassword: string
+): Promise<{ ok: true } | FlowError> {
+	const { db, now } = deps;
+
+	if (!(await rateLimit(db, 'passwordChange', `pwchange:acct:${userId}`, now))) {
+		return { ok: false, status: 429, message: RATE_LIMIT_MESSAGE };
+	}
+
+	const user = await getUser(db, userId);
+	if (!user || !(await verifyPasswordHash(user.passwordHash, currentPassword))) {
+		return { ok: false, status: 401, message: 'Current password is wrong' };
+	}
+
+	try {
+		await setPassword(db, userId, newPassword);
+	} catch (e) {
+		if (e instanceof StateError) return { ok: false, status: e.status, message: e.message };
+		throw e;
+	}
+	return { ok: true };
 }

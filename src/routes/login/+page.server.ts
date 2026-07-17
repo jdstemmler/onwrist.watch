@@ -4,6 +4,7 @@ import { SESSION_COOKIE, revokeSession, pruneSessions } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
 import { getMailer } from '$lib/server/mail';
 import { login } from '$lib/server/flows';
+import { pruneRateLimits } from '$lib/server/rate-limit';
 
 /** Only same-app relative paths may be redirect targets (no open redirects). */
 function safeNext(raw: string | null): string {
@@ -28,7 +29,9 @@ export const actions: Actions = {
 		const oldToken = cookies.get(SESSION_COOKIE);
 
 		const db = await getDb();
-		await pruneSessions(db); // housekeeping: clear expired rows on successful login attempts
+		// housekeeping: clear expired rows on every login attempt
+		await pruneSessions(db);
+		await pruneRateLimits(db);
 
 		const result = await login(
 			{ db, mailer: getMailer() },

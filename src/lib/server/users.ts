@@ -19,6 +19,13 @@ export async function createUser(db: DB, email: string, password: string): Promi
 	return row;
 }
 
+/** True for a Postgres unique-constraint violation (SQLSTATE 23505), however
+ * many wrapper layers drizzle's driver puts around it. Used to catch
+ * TOCTOU races on `email` (concurrent signup / concurrent email-change). */
+export function isUniqueViolation(e: unknown): boolean {
+	return (e as { cause?: { code?: string } } | null)?.cause?.code === '23505';
+}
+
 export async function findUserByEmail(db: DB, email: string): Promise<User | null> {
 	const rows = await db.select().from(users).where(eq(users.email, emailKey(email))).limit(1);
 	return rows[0] ?? null;

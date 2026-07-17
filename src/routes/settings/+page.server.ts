@@ -3,9 +3,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { SESSION_COOKIE } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
 import { getMailer } from '$lib/server/mail';
-import { getUser, setPassword, updatePrefs } from '$lib/server/users';
-import { verifyPasswordHash } from '$lib/server/passwords';
-import { requestEmailChange, resendVerification } from '$lib/server/flows';
+import { updatePrefs } from '$lib/server/users';
+import { changePassword, requestEmailChange, resendVerification } from '$lib/server/flows';
 import { StateError } from '$lib/server/sessions';
 
 const IANA_TIME_ZONES = new Set(Intl.supportedValuesOf('timeZone'));
@@ -27,21 +26,16 @@ export const actions: Actions = {
 		const currentPassword = (form.get('currentPassword') as string) ?? '';
 		const newPassword = (form.get('newPassword') as string) ?? '';
 
-		const db = await getDb();
-		const user = await getUser(db, locals.user!.id);
-		if (!user || !(await verifyPasswordHash(user.passwordHash, currentPassword))) {
-			return fail(401, { action: 'password', message: 'Current password is wrong' });
-		}
-
-		try {
-			// Revokes every session for this account — the current one included —
-			// so the user must log back in. Clear the cookie and bounce them,
-			// same pattern as the reset-confirm flow.
-			await setPassword(db, user.id, newPassword);
-		} catch (e) {
-			if (e instanceof StateError) return fail(e.status, { action: 'password', message: e.message });
-			throw e;
-		}
+		// Revokes every session for this account — the current one included —
+		// so the user must log back in. Clear the cookie and bounce them, same
+		// pattern as the reset-confirm flow.
+		const result = await changePassword(
+			{ db: await getDb(), mailer: getMailer() },
+			locals.user!.id,
+			currentPassword,
+			newPassword
+		);
+		if (!result.ok) return fail(result.status, { action: 'password', message: result.message });
 
 		cookies.delete(SESSION_COOKIE, { path: '/' });
 		redirect(303, '/login?flash=password-updated');
