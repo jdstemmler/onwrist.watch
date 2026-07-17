@@ -44,8 +44,8 @@ describe('sliceSession', () => {
 describe('statsByWatch', () => {
 	it('computes wears, distinct local days, hours, cost-per-wear; clamps open sessions to now', async () => {
 		// Speedy: two sessions on two local days, 8h + (open since 14:00Z clamped to NOW = 10h)
-		await createSession(db, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
-		await putOn(db, { watchId: speedy, at: new Date('2026-07-14T14:00:00Z') });
+		await createSession(db, userId, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		await putOn(db, userId, { watchId: speedy, at: new Date('2026-07-14T14:00:00Z') });
 		const s = (await statsByWatch(db, TZ, NOW)).find((x) => x.watchId === speedy)!;
 		expect(s.wears).toBe(2);
 		expect(s.distinctDays).toBe(2);
@@ -64,7 +64,7 @@ describe('statsByWatch gifts', () => {
 				.values({ userId, brand: 'Timex', model: 'Snoopy Chrono', pricePaidCents: 12000, isGift: true })
 				.returning()
 		)[0].id;
-		await createSession(db, { watchId: gifted, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		await createSession(db, userId, { watchId: gifted, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
 		const s = (await statsByWatch(db, TZ, NOW)).find((x) => x.watchId === gifted)!;
 		expect(s.wears).toBe(1);
 		expect(s.costPerWearCents).toBeNull();
@@ -74,9 +74,9 @@ describe('statsByWatch gifts', () => {
 describe('statsByDow / statsByTod / statsCalendar / statsSummary', () => {
 	beforeEach(async () => {
 		// Monday July 13: Speedy 7 AM - 3 PM PDT (14:00-22:00Z)
-		await createSession(db, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		await createSession(db, userId, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
 		// Tuesday July 14: Datejust 8 AM - 4 PM PDT (15:00-23:00Z)
-		await createSession(db, { watchId: datejust, startedAt: new Date('2026-07-14T15:00:00Z'), endedAt: new Date('2026-07-14T23:00:00Z') });
+		await createSession(db, userId, { watchId: datejust, startedAt: new Date('2026-07-14T15:00:00Z'), endedAt: new Date('2026-07-14T23:00:00Z') });
 	});
 
 	it('by-dow attributes hours to local weekday per watch', async () => {
