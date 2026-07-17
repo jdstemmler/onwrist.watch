@@ -39,8 +39,10 @@ export async function setPassword(db: DB, userId: number, password: string): Pro
 	const policyError = passwordPolicyError(password);
 	if (policyError) throw new StateError(policyError);
 	const passwordHash = await hashPassword(password);
-	await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
-	await revokeAllSessions(db, userId);
+	await db.transaction(async (tx) => {
+		await tx.update(users).set({ passwordHash }).where(eq(users.id, userId));
+		await revokeAllSessions(tx, userId);
+	});
 }
 
 export async function applyEmailChange(
