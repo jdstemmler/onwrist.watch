@@ -9,13 +9,27 @@
 
 	type Theme = 'auto' | 'light' | 'dark';
 	let theme = $state<Theme>('auto');
+	let menuOpen = $state(false);
+	let menuEl: HTMLDivElement | undefined = $state();
 
 	onMount(() => {
 		const t = localStorage.getItem('theme');
 		if (t === 'light' || t === 'dark') theme = t;
+		const onClick = (e: MouseEvent) => {
+			if (menuOpen && menuEl && !menuEl.contains(e.target as Node)) menuOpen = false;
+		};
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') menuOpen = false;
+		};
+		document.addEventListener('click', onClick);
+		document.addEventListener('keydown', onKey);
+		return () => {
+			document.removeEventListener('click', onClick);
+			document.removeEventListener('keydown', onKey);
+		};
 	});
 
-	const GLYPH: Record<Theme, string> = { auto: '\u25d0', light: '\u25cb', dark: '\u25cf' };
+	const GLYPH: Record<Theme, string> = { auto: '◐', light: '○', dark: '●' };
 
 	function cycleTheme() {
 		theme = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto';
@@ -34,6 +48,7 @@
 			.querySelector('meta[name="theme-color"]')
 			?.setAttribute('content', dark ? '#131614' : '#eef0ec');
 	}
+
 	const links = [
 		{ href: '/', label: 'Collection' },
 		{ href: '/log', label: 'Wear Log' },
@@ -42,43 +57,59 @@
 </script>
 
 <nav>
-	<span class="brand">{appName}</span>
+	<a class="brand" href="/" aria-label={appName}>
+		<img src="/icon-192.png" alt="" width="30" height="30" />
+		<span class="wordmark">{appName}</span>
+	</a>
 	<div class="links">
 		{#each links as l}
 			<a href={l.href} aria-current={page.url.pathname === l.href ? 'page' : undefined}>{l.label}</a>
 		{/each}
 	</div>
-	<button class="theme" onclick={cycleTheme} title="Theme: {theme}" aria-label="Theme: {theme}">
-		<span aria-hidden="true">{GLYPH[theme]}</span><span class="theme-label">{theme}</span>
-	</button>
-	{#if isAdmin}
-		<a
-			class="admin-link"
-			href="/admin"
-			aria-current={page.url.pathname === '/admin' ? 'page' : undefined}
-		>
-			Admin
-		</a>
-	{/if}
 	{#if email}
-		<a
-			class="gear"
-			href="/settings"
-			aria-current={page.url.pathname === '/settings' ? 'page' : undefined}
-			title="Settings"
-			aria-label="Settings"
-		>
-			&#9881;
-		</a>
+		<div class="menu" bind:this={menuEl}>
+			<button
+				class="menu-trigger"
+				onclick={() => (menuOpen = !menuOpen)}
+				aria-haspopup="menu"
+				aria-expanded={menuOpen}
+				aria-label="Menu"
+			>
+				<svg viewBox="0 0 4 16" width="4" height="16" fill="currentColor" aria-hidden="true">
+					<circle cx="2" cy="2" r="1.7" />
+					<circle cx="2" cy="8" r="1.7" />
+					<circle cx="2" cy="14" r="1.7" />
+				</svg>
+			</button>
+			{#if menuOpen}
+				<div class="menu-panel" role="menu">
+					<button class="item" role="menuitem" type="button" onclick={cycleTheme}>
+						<span class="glyph" aria-hidden="true">{GLYPH[theme]}</span>
+						Theme · {theme}
+					</button>
+					{#if isAdmin}
+						<a
+							class="item"
+							role="menuitem"
+							href="/admin"
+							onclick={() => (menuOpen = false)}
+							aria-current={page.url.pathname === '/admin' ? 'page' : undefined}>Admin</a
+						>
+					{/if}
+					<a
+						class="item"
+						role="menuitem"
+						href="/settings"
+						onclick={() => (menuOpen = false)}
+						aria-current={page.url.pathname === '/settings' ? 'page' : undefined}>Settings</a
+					>
+					<form method="POST" action="/login?/logout">
+						<button class="item danger" role="menuitem" type="submit">Log out</button>
+					</form>
+				</div>
+			{/if}
+		</div>
 	{/if}
-	<form method="POST" action="/login?/logout" class="logout">
-		<button type="submit" title="Lock" aria-label="Lock">
-			<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
-				<rect x="3" y="7.2" width="10" height="6.8" rx="1.2" />
-				<path d="M5 7.2V5a3 3 0 0 1 6 0v2.2" />
-			</svg>
-		</button>
-	</form>
 </nav>
 
 <style>
@@ -87,7 +118,7 @@
 		display: flex;
 		align-items: center;
 		gap: 1.5rem;
-		padding: 0.9rem 1.25rem;
+		padding: 0.7rem 1.25rem;
 		background: var(--bg-raised);
 	}
 
@@ -106,9 +137,6 @@
 			var(--navy) 75% 100%
 		);
 	}
-
-	/* lume tokens run hot on the black dial — keep the stripe quiet.
-	   Mirrors app.css's two-way dark selection (system pref + manual). */
 	@media (prefers-color-scheme: dark) {
 		:global(:root:not([data-theme='light'])) nav::after {
 			opacity: 0.65;
@@ -118,115 +146,52 @@
 		opacity: 0.65;
 	}
 
-	.theme {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		background: none;
-		border: none;
-		padding: 0.25rem 0.35rem;
-		font-family: var(--font-display);
-		font-size: 0.72rem;
-		font-weight: 600;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
-	}
-	.theme:hover {
-		color: var(--fg);
-		border: none;
-	}
-
-	@media (max-width: 34rem) {
-		.theme-label {
-			display: none;
-		}
-		.theme {
-			font-size: 0.95rem;
-			padding: 0.15rem 0.25rem;
-		}
-	}
-
-	.gear {
-		display: inline-flex;
-		align-items: center;
-		padding: 0.15rem 0.25rem;
-		font-size: 0.95rem;
-		color: var(--fg-muted);
-		text-decoration: none;
-	}
-	.gear:hover,
-	.gear[aria-current='page'] {
-		color: var(--fg);
-	}
-
-	.admin-link {
-		font-family: var(--font-display);
-		font-size: 0.72rem;
-		font-weight: 600;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
-		text-decoration: none;
-		padding: 0.25rem 0.35rem;
-	}
-	.admin-link:hover,
-	.admin-link[aria-current='page'] {
-		color: var(--navy);
-	}
-
-	.logout {
-		display: contents;
-	}
-	.logout button {
-		background: none;
-		border: none;
-		padding: 0.15rem 0.25rem;
-		font-size: 0.95rem;
-		color: var(--fg-muted);
-	}
-	.logout button:hover {
-		color: var(--fg);
-		border: none;
-	}
-
 	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		margin-right: auto;
+		text-decoration: none;
+	}
+	.brand img {
+		display: block;
+		width: 30px;
+		height: 30px;
+		border-radius: 7px;
+	}
+	.wordmark {
 		font-family: var(--font-display);
 		font-size: 1.05rem;
 		font-weight: 600;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: var(--fg);
-		margin-right: auto;
+	}
+	/* Phones: logo only — the wordmark's width isn't worth it next to the
+	   section links; desktop/tablet keep the full brand. */
+	@media (max-width: 34rem) {
+		.wordmark {
+			display: none;
+		}
 	}
 
 	.links {
 		display: flex;
 		gap: 1.25rem;
 	}
-
-	/* Only the primary section links get the size, underline, and current-page
-	   affordance — NOT the gear/admin/logout controls, which have their own
-	   styling (scoping this to `.links a` stops the underline bar leaking
-	   under the ⚙ gear and Admin link on /settings and /admin). */
 	.links a {
 		position: relative;
 		font-size: 0.9rem;
 		color: var(--fg-muted);
 		text-decoration: none;
 		padding-block: 0.25rem;
-		white-space: nowrap; /* keep "Wear Log" on one line when the row is tight */
+		white-space: nowrap;
 		transition: color 0.15s ease;
 	}
-
-	.links a:hover {
-		color: var(--fg);
-	}
-
+	.links a:hover,
 	.links a[aria-current='page'] {
 		color: var(--fg);
 	}
-
 	.links a[aria-current='page']::after {
 		content: '';
 		position: absolute;
@@ -238,31 +203,91 @@
 		border-radius: 1px;
 	}
 
-	.logout button {
+	/* Utility dropdown: theme / (admin) / settings / logout */
+	.menu {
+		position: relative;
+		display: inline-flex;
+	}
+	.menu-trigger {
 		display: inline-flex;
 		align-items: center;
+		justify-content: center;
+		background: none;
+		border: none;
+		padding: 0.4rem 0.5rem;
+		border-radius: var(--radius);
+		color: var(--fg-muted);
+		cursor: pointer;
+	}
+	.menu-trigger:hover,
+	.menu-trigger[aria-expanded='true'] {
+		color: var(--fg);
 	}
 
-	/* Mobile: a single row can't hold brand + 3 links + theme/admin/gear/lock
-	   without overflowing a phone. Drop the section links onto their own
-	   centered second row (order: 2 + full basis) so nothing spills off-screen
-	   and every control stays reachable. No hamburger, no JS. */
-	@media (max-width: 40rem) {
+	.menu-panel {
+		position: absolute;
+		top: calc(100% + 0.55rem);
+		right: 0;
+		z-index: 30;
+		min-width: 11rem;
+		display: flex;
+		flex-direction: column;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+		overflow: hidden;
+	}
+	.menu-panel form {
+		display: contents;
+	}
+
+	.item {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		width: 100%;
+		text-align: left;
+		background: none;
+		border: none;
+		padding: 0.62rem 0.9rem;
+		font-family: var(--font-display);
+		font-size: 0.74rem;
+		font-weight: 600;
+		letter-spacing: 0.07em;
+		text-transform: uppercase;
+		color: var(--fg-muted);
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.item:hover,
+	.item[aria-current='page'] {
+		color: var(--fg);
+		background: color-mix(in srgb, var(--fg) 7%, transparent);
+	}
+	.item .glyph {
+		font-size: 0.9rem;
+		line-height: 1;
+	}
+	/* set the destructive action apart with a divider */
+	.menu-panel form .item {
+		border-top: 1px solid var(--border);
+		color: var(--danger);
+	}
+	.menu-panel form .item:hover {
+		background: color-mix(in srgb, var(--danger) 8%, transparent);
+	}
+
+	@media (max-width: 26rem) {
 		nav {
-			flex-wrap: wrap;
-			row-gap: 0.5rem;
-			column-gap: 0.9rem;
-			padding: 0.7rem 1rem;
+			gap: 0.9rem;
+			padding: 0.6rem 0.9rem;
 		}
 		.links {
-			order: 2;
-			flex-basis: 100%;
-			justify-content: center;
-			gap: 1.75rem;
+			gap: 1rem;
 		}
-		.brand {
-			font-size: 0.95rem;
-			letter-spacing: 0.1em;
+		.links a {
+			font-size: 0.84rem;
 		}
 	}
 </style>
