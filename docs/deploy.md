@@ -149,10 +149,26 @@ and running it again.
    `docker-compose.yml`'s `environment:` block, since the running app never
    needs it), so it's fine to keep it in `.env` and export it into the
    migration command's shell, or pass it inline as shown below.
+   `OWNER_EMAIL` and `ADMIN_EMAIL` must be **different** addresses — the
+   migration seeds the owner as a member, and `ensureAdmin` never promotes
+   an existing account, so a shared address would leave you with no admin
+   (silent `/admin` 404).
 3. **Bring up Postgres only, then migrate.** `docker compose up -d db`
    starts just the `db` service — no app, nothing bound to `:3000`, nothing
-   public (`db` is not tunneled). Then run the migration against the real
-   data:
+   public (`db` is not tunneled). `docker compose` reads `.env` on its own,
+   but the migration command below interpolates `${POSTGRES_PASSWORD}` into
+   a shell variable, and your interactive shell does **not** have it —
+   load `.env` into the shell first:
+   ```sh
+   set -a; . ./.env; set +a
+   ```
+   Do this once per shell before this step and before any later command in
+   this section that interpolates `.env` vars (`${POSTGRES_PASSWORD}`, or
+   the `-e ADMIN_EMAIL`/`-e MAIL_FROM`/etc. flags in step 4's preview
+   `docker run`). If `POSTGRES_PASSWORD` contains URL-special characters
+   (`@ / # : ?`), percent-encode them before they land in `DATABASE_URL`
+   (e.g. `@` → `%40`) or the connection string will parse incorrectly. Then
+   run the migration against the real data:
    ```sh
    docker compose up -d db
    # db isn't published to the host by design (only :3000 is ever tunneled),
@@ -173,8 +189,10 @@ and running it again.
    the full stack; the app binds `:3000` and is instantly live through the
    existing tunnel. Log in as the owner via the reset flow (`/reset` against
    `OWNER_EMAIL`) — production's `.env` has `RESEND_API_KEY` set, so this is
-   a **real email send** to the owner's inbox, not a logged link; the reset
-   link expires in **30 minutes**, so only request it once you're at the
+   a **real email send** to the owner's inbox, not a logged link (if
+   `RESEND_API_KEY` is unset, the reset link is in
+   `docker compose logs horolog` instead of an email); the reset link
+   expires in **30 minutes**, so only request it once you're at the
    keyboard ready to use it. Spot-check the migrated collection, stats, and
    the photo render on the real URL. Do the same for the admin
    (`ADMIN_EMAIL`, seeded at boot by `ensureAdmin`) to confirm `/admin`
@@ -182,18 +200,27 @@ and running it again.
 
    **To verify privately first** instead of going straight to `:3000`,
    build the image and run it manually on a throwaway host port before
-   touching the compose stack's `:3000` mapping:
+   touching the compose stack's `:3000` mapping. A plain `docker run` lands
+   on the default bridge network and can't reach the compose-network `db`,
+   so join that network explicitly and address `db` by its compose service
+   name instead of a container IP:
    ```sh
    docker build -t onwrist:cutover .
+   NET=$(docker inspect -f '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q db)")
    docker run --rm -d --name onwrist-preview -p 127.0.0.1:8443:3000 \
-     -e DATABASE_URL="postgres://onwrist:${POSTGRES_PASSWORD}@${DB_IP}:5432/onwrist" \
+     --network "$NET" \
+     -e DATABASE_URL="postgres://onwrist:${POSTGRES_PASSWORD}@db:5432/onwrist" \
      -e ORIGIN="http://localhost:8443" -e ADMIN_EMAIL \
      -e SESSION_DAYS -e APP_NAME -e MAIL_FROM -e RESEND_API_KEY \
      -e TURNSTILE_SITE_KEY -e TURNSTILE_SECRET_KEY \
      -v "$(pwd)/data:/data" onwrist:cutover
    ```
-   Browse `http://localhost:8443` on the homelab box (nothing routes to
-   `8443` from the tunnel), confirm what you need, then
+   This still interpolates `.env` vars (`${POSTGRES_PASSWORD}`, and the
+   bare `-e ADMIN_EMAIL`/`-e MAIL_FROM`/etc. flags pull their values from
+   the operator's shell environment) — make sure step 3's
+   `set -a; . ./.env; set +a` is still in effect in this shell. Browse
+   `http://localhost:8443` on the homelab box (nothing routes to `8443`
+   from the tunnel), confirm what you need, then
    `docker stop onwrist-preview` and run step 4's `docker compose up -d` for
    the real go-live.
 5. **Keep the SQLite file as the rollback** for a few weeks — `data/`
@@ -209,7 +236,9 @@ and running it again.
    `migrateLegacy` already rolled back its own writes (deletes the owner —
    cascading watches/sessions/photos — and any copied photo objects), so
    Postgres is clean and a re-run of step 3 is safe without any manual
-   cleanup.
+   cleanup. To deliberately redo a **successful** migration instead (e.g.
+   wrong `OWNER_EMAIL`), wipe the target Postgres first — `docker compose
+   down -v` (this destroys the `pgdata` volume) — then re-run from step 3.
 
 ## Backup
 

@@ -16,6 +16,13 @@ if (!OWNER_EMAIL) {
 	process.exit(1);
 }
 
+if (!DATABASE_URL) {
+	console.error(
+		'DATABASE_URL is required (without it, pg silently falls back to libpq localhost defaults).'
+	);
+	process.exit(1);
+}
+
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = createDb(pool);
 
