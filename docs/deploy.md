@@ -178,6 +178,27 @@ and running it again.
      OWNER_EMAIL="you@example.com" \
      npm run migrate:legacy
    ```
+   > **⚠️ If `data/photos/` is root-owned (an old container created it) and
+   > you have no passwordless sudo, the host-run command above fails at the
+   > photo-copy step with `EACCES … mkdir data/photos/…` — the migration
+   > rolls back cleanly (Postgres left empty, source untouched), but it can't
+   > write the migrated photos as your user.** Run it instead inside a
+   > **root container** whose node major + libc match the host (host node
+   > 24/glibc → `node:24`), mounting the repo + `data/` and joining the db
+   > network. This also avoids needing `.env` in your shell for the DB host
+   > (`@db:5432` resolves on the compose network):
+   > ```sh
+   > PW=$(grep -E '^POSTGRES_PASSWORD=' .env | cut -d= -f2-)
+   > docker run --rm --network "$(docker inspect -f '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}}{{end}}' "$(docker compose ps -q db)")" \
+   >   -v "$PWD":/app -v "$PWD/data":/data -w /app \
+   >   -e LEGACY_DB=/data/watches.db -e LEGACY_PHOTOS=/data/photos -e DATA_DIR=/data \
+   >   -e OWNER_EMAIL="you@example.com" \
+   >   -e DATABASE_URL="postgres://onwrist:${PW}@db:5432/onwrist" \
+   >   node:24 npx tsx scripts/migrate-legacy.ts
+   > ```
+   > The migrated photos are then root-owned, matching what the (root)
+   > app container reads. Note: a failed host attempt burns an identity id
+   > on rollback, so the owner's `id` may be 2 rather than 1 — harmless.
    This runs against `LEGACY_DB=./data/watches.db` and
    `LEGACY_PHOTOS=./data/photos` (the script's defaults — the real data, not
    a copy) and writes migrated photos under `DATA_DIR=./data` (default),
