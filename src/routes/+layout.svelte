@@ -8,25 +8,27 @@
 	const resendResult = $derived(
 		page.form?.action === 'resendVerify' ? page.form : undefined
 	);
+
+	const GATE_ROUTES = new Set(['/login', '/signup', '/verify', '/reset', '/reset/confirm']);
 </script>
 
-{#if page.route.id !== '/login'}
+{#if !GATE_ROUTES.has(page.route.id ?? '')}
 	<Nav appName={data.appName} email={data.email} />
-{/if}
-{#if data.email && !data.verified}
-	<div class="unverified-banner">
-		<p>Verify your email to add watches.</p>
-		{#if resendResult?.sent}
-			<span class="sent">Sent — check your inbox.</span>
-		{:else}
-			<form method="POST" action="/settings?/resendVerify" use:enhance>
-				{#if resendResult?.message}
-					<span class="error">{resendResult.message}</span>
-				{/if}
-				<button type="submit">Resend email</button>
-			</form>
-		{/if}
-	</div>
+	{#if data.email && !data.verified}
+		<div class="unverified-banner">
+			<p>Verify your email to add watches.</p>
+			{#if resendResult?.sent}
+				<span class="sent">Sent — check your inbox.</span>
+			{:else}
+				<form method="POST" action="/settings?/resendVerify" use:enhance>
+					{#if resendResult?.message}
+						<span class="error">{resendResult.message}</span>
+					{/if}
+					<button type="submit">Resend email</button>
+				</form>
+			{/if}
+		</div>
+	{/if}
 {/if}
 <main>{@render children()}</main>
 

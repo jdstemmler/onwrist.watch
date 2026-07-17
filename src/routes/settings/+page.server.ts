@@ -8,6 +8,8 @@ import { verifyPasswordHash } from '$lib/server/passwords';
 import { requestEmailChange, resendVerification } from '$lib/server/flows';
 import { StateError } from '$lib/server/sessions';
 
+const IANA_TIME_ZONES = new Set(Intl.supportedValuesOf('timeZone'));
+
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!;
 	return {
