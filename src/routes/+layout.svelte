@@ -13,7 +13,7 @@
 </script>
 
 {#if !GATE_ROUTES.has(page.route.id ?? '')}
-	<Nav appName={data.appName} email={data.email} />
+	<Nav appName={data.appName} email={data.email} isAdmin={data.role === 'admin'} />
 	{#if data.email && !data.verified}
 		<div class="unverified-banner">
 			<p>Verify your email to add watches.</p>
