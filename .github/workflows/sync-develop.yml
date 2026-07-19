@@ -1,0 +1,29 @@
+name: Sync develop
+
+# Keeps develop fast-forwarded to main so direct-to-main merges (hotfixes,
+# docs) don't leave it stale. Runs only after CI succeeds on main and pushes
+# the exact SHA that passed — no tests are re-run, and develop's required
+# "test" status check is satisfied by the check already attached to that
+# commit. The push is fast-forward-only: if develop has somehow diverged
+# from main, the job fails loudly instead of force-pushing — reconcile by
+# hand (develop should always be an ancestor of main; keep using merge
+# commits, not squash, for develop -> main release PRs to preserve that).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git push origin origin/main:develop

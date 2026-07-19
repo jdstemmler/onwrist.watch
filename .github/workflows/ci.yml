@@ -1,8 +1,12 @@
 name: CI
 
+# Pushes to develop are deliberately not a trigger: every commit reaching
+# develop was already tested — feature PRs run CI here (and develop's
+# required check is strict/up-to-date), and the sync-develop workflow only
+# fast-forwards SHAs that passed CI on main.
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main, develop]
 

@@ -24,6 +24,12 @@ Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session log
 - **Small hotfixes and docs changes:** branch off `main` and PR directly
   into `main`.
 - Never push to `main` or `develop` directly; everything lands via PR.
+  The one exception is automated: after CI passes on `main`, the
+  `sync-develop` workflow fast-forwards `develop` to `main` so
+  direct-to-`main` merges never leave `develop` stale. It never
+  force-pushes — if it fails, `develop` has diverged from `main`
+  (usually a squashed release PR); reconcile manually and keep using
+  merge commits for `develop` → `main` releases.
 - Deploys always ship from `main`: on the homelab box, pull and
   `docker compose up -d --build horolog` (see "Routine deploys" in
   `docs/deploy.md`).
