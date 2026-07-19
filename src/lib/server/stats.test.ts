@@ -54,10 +54,19 @@ describe('statsByWatch', () => {
 		expect(s.wears).toBe(2);
 		expect(s.distinctDays).toBe(2);
 		expect(s.hours).toBeCloseTo(18, 5);
-		expect(s.costPerWearCents).toBe(250000); // 500000 / 2 days
+		expect(s.costPerWearCents).toBe(250000); // 500000 / 2 wears
 		const d = (await statsByWatch(db, alice, TZ, NOW)).find((x) => x.watchId === datejust)!;
 		expect(d.wears).toBe(0);
 		expect(d.costPerWearCents).toBeNull(); // no price on Datejust, no wears anyway
+	});
+
+	it('divides by sessions, not days: one wear across midnight is still one wear', async () => {
+		// 11 PM July 13 - 1 AM July 14 PDT = 06:00-08:00Z July 14
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-14T06:00:00Z'), endedAt: new Date('2026-07-14T08:00:00Z') });
+		const s = (await statsByWatch(db, alice, TZ, NOW)).find((x) => x.watchId === speedy)!;
+		expect(s.wears).toBe(1);
+		expect(s.distinctDays).toBe(2);
+		expect(s.costPerWearCents).toBe(500000);
 	});
 });
 

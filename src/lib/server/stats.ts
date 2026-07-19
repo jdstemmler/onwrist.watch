@@ -60,8 +60,8 @@ export async function statsByWatch(db: DB, userId: number, tz: string, now: Date
 			hours: minutes / 60,
 			lastWornAt,
 			costPerWearCents:
-				w.pricePaidCents != null && days.size > 0 && !w.isGift
-					? Math.round(w.pricePaidCents / days.size)
+				w.pricePaidCents != null && mine.length > 0 && !w.isGift
+					? Math.round(w.pricePaidCents / mine.length)
 					: null
 		};
 	});
