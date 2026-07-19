@@ -14,16 +14,31 @@ Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session log
 - `npm run check` — svelte-check / typecheck
 - `npm run db:generate` — generate Drizzle migration after schema changes (unchanged in purpose: run after editing `src/lib/server/db/schema.ts`)
 - `npm run seed` — seed the scratch Postgres (one verified user + 12 watches + wear history; refuses non-empty DB). Account emails (verify/reset/change) are logged to the console, not sent, whenever `RESEND_API_KEY` is unset — the default for the scratch stack.
-- `docker compose up --build` — production-shaped run on :3000 (production compose project — see guard below)
+- `docker compose up -d --build horolog` — **deploy**: rebuild and recreate the live production app container on :3000 (run only as a deliberate deploy from `main` — see guard below)
+
+## Branching & deploy workflow
+
+- **Major features:** branch off `main`, PR into `develop`, and let CI
+  (typecheck + tests) pass there. When ready to ship, PR `develop` →
+  `main` and merge — that merge is the release.
+- **Small hotfixes and docs changes:** branch off `main` and PR directly
+  into `main`.
+- Never push to `main` or `develop` directly; everything lands via PR.
+- Deploys always ship from `main`: on the homelab box, pull and
+  `docker compose up -d --build horolog` (see "Routine deploys" in
+  `docs/deploy.md`).
 
 ## Production guard
 
-Production is stopped; its SQLite data (`data/watches.db`, `data/photos/`)
-is the rollback path until Plan C's migration/cutover lands. Use the
-scratch harness (`docker-compose.scratch.yml`, project `onwrist-scratch`)
-for all runtime verification — never bring up the default `docker compose`
-project against real data, and never write to `data/`. See `docs/deploy.md`
-for the full production topology, backup, and restore procedures.
+Production is **live**: the default `docker compose` project (Postgres +
+app on :3000) serves real user data through the cloudflared tunnel — the
+legacy SQLite cutover completed in July 2026. Use the scratch harness
+(`docker-compose.scratch.yml`, project `onwrist-scratch`) for all dev and
+runtime verification — never bring up, restart, or run one-off commands
+against the production project except as a deliberate deploy from `main`,
+and never touch `data/` (live photo storage under `data/photos/`, plus the
+retained pre-cutover SQLite archive `data/watches.db`). See
+`docs/deploy.md` for topology, routine deploys, backup, and restore.
 
 ## Invariants (never violate; enforced in `src/lib/server/sessions.ts`)
 

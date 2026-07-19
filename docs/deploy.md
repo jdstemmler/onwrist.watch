@@ -2,8 +2,8 @@
 
 onwrist runs as a SvelteKit app container plus a Postgres 17 container,
 normally on a homelab box behind a cloudflared tunnel. This doc covers local
-dev, the production topology, the one-time legacy cutover, backups, and the
-eventual homelab → hosted move.
+dev, the production topology, routine deploys, the (completed) one-time
+legacy cutover, backups, and the eventual homelab → hosted move.
 
 ## Local dev (scratch stack)
 
@@ -105,15 +105,33 @@ In front of both services: an existing cloudflared tunnel pointed at
 belt-and-suspenders; the app has its own per-account login (with rate
 limiting and a Turnstile check on signup) regardless.
 
-**Status this branch:** the `db` service and `DATABASE_URL` wiring above are
-merged into `docker-compose.yml`, but production has never been run against
-this compose file — production is currently stopped, still backed by SQLite
-(`data/watches.db`, `data/photos/`), and that SQLite data is the rollback
-path. Do not bring up the default compose project except as the deliberate,
-one-time "Legacy cutover" procedure below — bringing it up is the live
-go-live, not a routine action.
+**Status:** the legacy cutover has been run (July 2026) — production is
+**live** on this Postgres-backed compose stack, publicly reachable through
+the tunnel on `:3000`. `data/photos/` is live app storage (managed by
+`PhotoStorage`); `data/watches.db` is the pre-cutover SQLite archive, kept
+per step 5 of the cutover procedure. Day-to-day rollback is now Postgres
+backups (see "Backup" / "Restore procedure" below), not the SQLite file.
 
-## Legacy cutover (one-time)
+## Routine deploys
+
+Deploys ship from `main` (see "Branching & deploy workflow" in
+`CLAUDE.md`: features land on `develop` via PR, and a `develop` → `main`
+PR is the release). On the homelab box:
+
+```sh
+git pull --ff-only
+docker compose up -d --build horolog
+```
+
+This rebuilds the app image and recreates only the `horolog` service — the
+`db` container stays up, and Drizzle migrations run automatically at app
+boot. Verify with `docker compose logs --tail 20 horolog` (expect
+`Listening on http://0.0.0.0:3000`) and a smoke-test of `/log`.
+
+## Legacy cutover (one-time — COMPLETED)
+
+> ✅ This procedure was run in July 2026 and production now runs on the
+> Postgres stack. It is kept for the record; do not re-run it.
 
 > ⚠️ **The cloudflared tunnel is already live, routed at `:3000`.** The old
 > single-user app is stopped, but the tunnel was never taken down. The new
@@ -336,10 +354,10 @@ that happens):
 
 ## Cutover status
 
-Accounts (self-serve signup, per-user tenancy, quotas), the admin console,
-and the landing page all exist in the app (Plans B and C). The "Legacy
-cutover" section above is the only thing that authorizes bringing up the
-Postgres-backed `docker-compose.yml` against the real `data/` directory —
-until an operator deliberately runs it, **production stays on the
-pre-Plan-A image** (SQLite-backed), fully stopped, with its `data/`
-directory preserved as the rollback path.
+**Completed.** The legacy cutover was run in July 2026: production runs
+the Postgres-backed `docker-compose.yml` stack, serving accounts,
+per-user tenancy, quotas, the admin console, and the landing page (Plans
+B–D). `data/watches.db` remains on disk as the pre-cutover archive until
+the follow-up in cutover step 5 removes the migration scaffolding.
+Routine updates follow "Routine deploys" above; recovery follows
+"Restore procedure".
