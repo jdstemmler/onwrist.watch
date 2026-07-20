@@ -18,19 +18,26 @@ reverse proxy or Cloudflare tunnel.
 
 ## Branching workflow
 
-- **Major features:** branch off `main`, PR into `develop`, and let CI
-  (typecheck + tests) pass there. When ready to ship, PR `develop` →
-  `main` and merge — that merge is the release.
-- **Small hotfixes and docs changes:** branch off `main` and PR directly
-  into `main`.
-- Never push to `main` or `develop` directly; everything lands via PR.
-  The one exception is automated: after CI passes on `main`, the
-  `sync-develop` workflow fast-forwards `develop` to `main` so
-  direct-to-`main` merges never leave `develop` stale. It never
-  force-pushes — if it fails, `develop` has diverged from `main`
-  (usually a squashed release PR); reconcile manually and keep using
-  merge commits for `develop` → `main` releases.
-- Releases ship from `main` (see "Routine updates" in `docs/deploy.md`).
+Trunk-based. `main` is the trunk and the default branch; `production` is
+a pointer at the deployed commit.
+
+- **All changes** — features, chores, docs, dependency bumps — branch off
+  `main`, PR into `main`, and let CI (typecheck + tests) pass. Merging to
+  `main` does **not** deploy, so `main` can accumulate as many unreleased
+  features as a release needs. Squash or merge commit, either is fine.
+- **Releases** are the `Release` workflow (Actions → Release →
+  Run workflow), which fast-forwards `production` to `main` and
+  optionally tags. Compare `main...production` first to read exactly
+  what is about to ship. Railway watches `production`, so that
+  fast-forward is the deploy.
+- Never push to `main` or `production` directly; `main` lands via PR and
+  `production` moves only through the release workflow. Because
+  `production` only ever fast-forwards to a commit already on `main`, it
+  cannot diverge — if the release job ever reports otherwise, something
+  was pushed to it by hand.
+- Releases are tagged `vX.Y.Z` at the released `main` commit. Self-hosters
+  track tags rather than `main` (see `docs/deploy.md`), since `main`
+  holds unreleased work by design.
 
 ## Invariants (never violate; enforced in `src/lib/server/sessions.ts`)
 

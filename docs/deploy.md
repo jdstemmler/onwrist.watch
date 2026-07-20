@@ -115,8 +115,11 @@ Run this once before first boot (photo uploads fail with EACCES otherwise).
 
 ## Routine updates
 
+Releases are tagged `vX.Y.Z`. Update by checking out the newest one:
+
 ```sh
-git pull --ff-only
+git fetch --tags
+git checkout "$(git tag -l 'v*' --sort=-v:refname | head -1)"
 docker compose up -d --build onwrist
 ```
 
@@ -128,8 +131,11 @@ in the logs immediately rather than as 500s on first request). Verify with
 `Listening on http://0.0.0.0:3000`), `docker compose ps` (the `onwrist`
 healthcheck probes `/healthz`), and a smoke-test of `/log`.
 
-Only the latest `main` is supported; releases land on `main` as
-`develop` → `main` merges (see CONTRIBUTING.md).
+Track the tags, not `main`: `main` is the trunk and carries work that has
+not been released yet. The `production` branch always points at the most
+recent release, so `git checkout production` works too if you would rather
+follow a branch. Only the latest release is supported (see
+CONTRIBUTING.md).
 
 ## Backup
 

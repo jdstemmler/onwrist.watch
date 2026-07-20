@@ -1,14 +1,15 @@
 name: CI
 
-# Pushes to develop are deliberately not a trigger: every commit reaching
-# develop was already tested — feature PRs run CI here (and develop's
-# required check is strict/up-to-date), and the sync-develop workflow only
-# fast-forwards SHAs that passed CI on main.
+# `main` is the trunk, so it gets CI on every push — the release workflow
+# refuses to promote a SHA without a passing `test` check. Pushes to
+# `production` are deliberately not a trigger: it only ever fast-forwards
+# to a main commit CI already passed. Release PRs (main -> production) do
+# run, as a last look before shipping.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main, production]
 
 jobs:
   test:
