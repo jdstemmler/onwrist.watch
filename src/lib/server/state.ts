@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, isNotNull } from 'drizzle-orm';
 import type { DB } from './db';
 import { watches, wearSessions } from './db/schema';
 import { getOpenSession, watchLabel } from './sessions';
@@ -14,39 +14,21 @@ export type StateResponse = {
 export async function getState(db: DB, userId: number, tz: string): Promise<StateResponse> {
 	const open = await getOpenSession(db, userId);
 
-	const owned = (
-		await db
-			.select({
-				watch: watches,
-				// timestamptz -> the driver hands back a Date (node-postgres) or a
-				// pg-formatted string (PGlite in tests) — normalized below via `new Date(...)`.
-				// NB: the outer-row correlation is written as a literal `watches.id`
-				// (not the interpolated ${watches.id}) — drizzle renders an
-				// interpolated column reference unqualified (bare "id"), which the
-				// correlated subquery's own `wear_sessions.id` column then shadows,
-				// silently comparing wear_sessions.watch_id to wear_sessions.id
-				// instead of the outer watches.id (always NULL — no reordering ever
-				// happens). Bare `watches.id` avoids the outer projection colliding
-				// with the subquery's own same-named column.
-				lastWorn: sql<Date | null>`(
-					select max(started_at) from wear_sessions s where s.watch_id = watches.id
-				)`
-			})
-			.from(watches)
-			.where(and(eq(watches.userId, userId), eq(watches.status, 'owned')))
-	).sort(
-		(a, b) =>
-			(b.lastWorn ? new Date(b.lastWorn).getTime() : 0) -
-			(a.lastWorn ? new Date(a.lastWorn).getTime() : 0)
-	);
+	const owned = await db
+		.select()
+		.from(watches)
+		.where(and(eq(watches.userId, userId), eq(watches.status, 'owned')));
 
+	// Alphabetical, not wear-recency: a static order keeps the picker scannable
+	// (recency reshuffled the list on every swap).
 	const list = owned
-		.filter((r) => r.watch.id !== open?.watchId)
-		.map((r) => ({ id: r.watch.id, label: watchLabel(r.watch) }));
+		.filter((w) => w.id !== open?.watchId)
+		.map((w) => ({ id: w.id, label: watchLabel(w) }))
+		.sort((a, b) => a.label.localeCompare(b.label));
 
 	if (open) {
 		const w =
-			owned.find((r) => r.watch.id === open.watchId)?.watch ??
+			owned.find((o) => o.id === open.watchId) ??
 			(await db.select().from(watches).where(eq(watches.id, open.watchId)).limit(1))[0]!;
 		const label = watchLabel(w);
 		return {

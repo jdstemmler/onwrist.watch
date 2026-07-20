@@ -104,7 +104,11 @@
 						{/each}
 					</div>
 				</form>
-				<button type="button" class="picker-cancel" onclick={() => picker?.close()}>Cancel</button>
+				<!-- autofocus: showModal() otherwise focuses the first watch button,
+				     which iOS Safari renders with a focus ring that reads as a
+				     pre-selected watch. Cancel is the one safe place to land. -->
+				<!-- svelte-ignore a11y_autofocus -->
+				<button type="button" class="picker-cancel" autofocus onclick={() => picker?.close()}>Cancel</button>
 			</dialog>
 			{/if}
 		</section>
