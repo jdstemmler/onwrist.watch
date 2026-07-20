@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withPending } from '$lib/pending';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -16,7 +17,7 @@
 			<p class="lead">If that address has an account, a reset link is on its way.</p>
 			<a class="button primary" href="/login">Back to login</a>
 		{:else}
-			<form method="POST" use:enhance>
+			<form method="POST" use:enhance={withPending()}>
 				{#if form?.message}
 					<p class="error" role="alert">{form.message}</p>
 				{/if}

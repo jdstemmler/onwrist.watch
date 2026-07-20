@@ -1,5 +1,5 @@
-# Isolated verification stack for Plan A. NEVER use the default compose
-# project for Plan A work — production data lives there.
+# Disposable dev/verification stack. NEVER use the default compose project
+# for dev work — production data lives there.
 services:
   scratch-db:
     image: postgres:17-alpine

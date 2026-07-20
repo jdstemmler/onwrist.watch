@@ -8,13 +8,19 @@ export const GET: RequestHandler = async () =>
 		{
 			name: config.appName,
 			short_name: config.appName,
+			description: 'Watch collection and wear-session tracker',
+			// stable identity even if start_url ever changes
+			id: '/',
 			start_url: '/log',
 			display: 'standalone',
 			background_color: '#131614',
 			theme_color: '#131614',
 			icons: [
 				{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-				{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+				{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+				// padded onto an opaque background so Android's adaptive-icon
+				// crop doesn't letterbox the transparent dial
+				{ src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
 			]
 		},
 		{ headers: { 'content-type': 'application/manifest+json' } }

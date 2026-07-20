@@ -62,13 +62,15 @@ export const actions: Actions = {
 		const rawHours = form.get('staleSessionHours') as string | null;
 		const staleSessionHours = rawHours ? Number(rawHours) : undefined;
 
+		// Integer check included: the column is an integer, so a fractional
+		// value would pass a bare range check and 500 in the driver instead.
 		if (
 			staleSessionHours !== undefined &&
-			(!Number.isFinite(staleSessionHours) || staleSessionHours < 1 || staleSessionHours > 168)
+			(!Number.isInteger(staleSessionHours) || staleSessionHours < 1 || staleSessionHours > 168)
 		) {
 			return fail(400, {
 				action: 'prefs',
-				message: 'Stale-session hours must be between 1 and 168'
+				message: 'Stale-session hours must be a whole number between 1 and 168'
 			});
 		}
 

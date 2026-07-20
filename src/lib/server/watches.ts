@@ -3,8 +3,10 @@ import { z } from 'zod';
 import type { DB } from './db';
 import { watches, watchPhotos, type Watch } from './db/schema';
 import { statsByWatch, type WatchStats } from './stats';
-import { StateError } from './sessions';
+import { StateError } from './errors';
+import { lockUser } from './sessions';
 import { getUser } from './users';
+import { getStorage, type PhotoStorage } from './storage';
 
 const WATCH_QUOTA = 20;
 
@@ -49,15 +51,20 @@ export const watchFormSchema = z
 export type WatchFormData = z.infer<typeof watchFormSchema>;
 
 export async function createWatch(db: DB, userId: number, data: WatchFormData): Promise<Watch> {
-	const user = await getUser(db, userId);
-	const quota = WATCH_QUOTA * (user?.quotaMultiplier ?? 1);
-	const existing = (
-		await db.select({ id: watches.id }).from(watches).where(eq(watches.userId, userId))
-	).length;
-	if (existing >= quota) {
-		throw new StateError(`Watch limit reached (${quota}) — contact the admin if you need more`);
-	}
-	return (await db.insert(watches).values({ ...data, userId }).returning())[0];
+	// Quota check and insert serialize behind the user lock so concurrent
+	// creates can't both pass the check at 19/20 and land on 21.
+	return await db.transaction(async (tx) => {
+		await lockUser(tx, userId);
+		const user = await getUser(tx, userId);
+		const quota = WATCH_QUOTA * (user?.quotaMultiplier ?? 1);
+		const existing = (
+			await tx.select({ id: watches.id }).from(watches).where(eq(watches.userId, userId))
+		).length;
+		if (existing >= quota) {
+			throw new StateError(`Watch limit reached (${quota}) — contact the admin if you need more`);
+		}
+		return (await tx.insert(watches).values({ ...data, userId }).returning())[0];
+	});
 }
 
 export async function updateWatch(
@@ -78,8 +85,30 @@ export async function updateWatch(
 }
 
 /** Cross-tenant calls are a silent no-op (the row just isn't in `userId`'s ownership scope). */
-export async function deleteWatch(db: DB, userId: number, id: number): Promise<void> {
-	await db.delete(watches).where(and(eq(watches.id, id), eq(watches.userId, userId)));
+export async function deleteWatch(
+	db: DB,
+	userId: number,
+	id: number,
+	storage: PhotoStorage = getStorage()
+): Promise<void> {
+	// The FK cascade removes photo *rows*; the *files* must go explicitly or
+	// they'd count against the user's storage quota forever (sizeOfPrefix
+	// walks the disk). Row delete first, files after: a crash in between
+	// leaves orphaned files (quota-inflating but harmless), whereas the
+	// reverse order could strand live rows pointing at missing files.
+	const photoPaths = (
+		await db
+			.select({ filePath: watchPhotos.filePath })
+			.from(watchPhotos)
+			.innerJoin(watches, eq(watches.id, watchPhotos.watchId))
+			.where(and(eq(watchPhotos.watchId, id), eq(watches.userId, userId)))
+	).map((p) => p.filePath);
+	const deleted = await db
+		.delete(watches)
+		.where(and(eq(watches.id, id), eq(watches.userId, userId)))
+		.returning({ id: watches.id });
+	if (deleted.length === 0) return;
+	for (const filePath of photoPaths) await storage.delete(filePath);
 }
 
 export async function listWatchesWithMeta(db: DB, userId: number, tz: string, now: Date) {

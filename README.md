@@ -4,10 +4,26 @@ A self-hosted, multi-tenant watch-collection tracker: self-serve accounts,
 inventory management, low-friction wear-session logging via an installable
 PWA, and a stats dashboard (day-of-week, time-of-day, total wear,
 cost-per-wear, calendar views). Runs as a SvelteKit app + Postgres via
-docker compose on a homelab, reachable from anywhere via cloudflared.
+docker compose, reachable from anywhere via a Cloudflare tunnel.
 
-![dashboard screenshot placeholder](docs/screenshot.png)
-<!-- TODO: replace with a real screenshot after first deploy -->
+![Collection view, light and dark](static/landing/collection-light.webp)
+
+## What you need
+
+- A box that runs Docker (the reference deploy is a homelab server).
+- To send real account emails (verify / password reset): a
+  [Resend](https://resend.com) API key and a verified sender domain.
+  Without one, account emails are logged to the container's stdout —
+  fine for trying it out, not for real users.
+- To open signups to others: [Cloudflare
+  Turnstile](https://developers.cloudflare.com/turnstile/) keys. The
+  signup captcha fails closed, so **signup is disabled until these are
+  set**.
+- Optional but recommended for public exposure: a
+  [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+  tunnel. The compose file assumes it (the app port binds to loopback and
+  client IPs are read from `CF-Connecting-IP`) — see `.env.example` for
+  the two variables to flip for a LAN-only deploy.
 
 ## Quickstart
 
@@ -20,30 +36,28 @@ cp .env.example .env
 # edit .env: set POSTGRES_PASSWORD, ORIGIN (the exact URL you'll load the
 # dashboard from), and — to actually receive verify/reset emails —
 # RESEND_API_KEY, MAIL_FROM, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY.
-# Leaving RESEND_API_KEY unset logs account emails to the container's
-# stdout instead of sending them.
+mkdir -p data && sudo chown -R 1000:1000 data   # app runs as uid 1000
 docker compose up -d
 ```
 
-The app serves on port 3000. Every page sits behind a per-account login
-(sign up with an email + password, verify by email); sessions last 30 days
-(sliding) so your phone stays logged in.
+The app serves on port 3000 (loopback-only by default). Every page sits
+behind a per-account login (sign up with an email + password, verify by
+email); sessions last 30 days (sliding) so your phone stays logged in.
 
 ## Logging wear from your phone
 
-Open `http://<host>:3000/log` in Safari and **Add to Home Screen**. The
-installed app opens straight to the wear log: current on-wrist state, one-tap
-put-on / swap / take-off, backfill, and inline corrections. That's the whole
-workflow — no companion app or shortcut needed.
+Open `/log` in your phone's browser and **Add to Home Screen**. The
+installed app opens straight to the wear log: current on-wrist state,
+one-tap put-on / swap / take-off, backfill, and inline corrections. That's
+the whole workflow — no companion app needed.
 
 ## Exposing it (cloudflared)
 
-Point your existing cloudflared tunnel at `localhost:3000`. This is a
-**later** step, not required to use the app — on your home LAN the app works
-as-is, protected by its own login. Cloudflare Access on top is optional
-belt-and-suspenders — the app no longer depends on edge auth.
-
-Remember to update `ORIGIN` in `.env` to the tunnel hostname when you switch.
+Point your cloudflared tunnel at `localhost:3000` and set `ORIGIN` in
+`.env` to the tunnel hostname. The per-IP rate limits depend on
+`ADDRESS_HEADER=CF-Connecting-IP` (the compose default) being truthful,
+which it is exactly when the only path to the port is through Cloudflare —
+that's why the port binds to loopback.
 
 ## Development
 
@@ -61,6 +75,9 @@ npm run check        # svelte-check / typecheck
 npm run db:generate  # generate a Drizzle migration after schema changes
 npm run seed         # seed the scratch DB with 12 watches + wear history (refuses non-empty DB)
 ```
+
+`.env.scratch` is tracked on purpose: it holds only throwaway scratch-stack
+credentials and Cloudflare's public always-pass Turnstile test keys.
 
 Tear the scratch stack down with
 `docker compose -f docker-compose.scratch.yml -p onwrist-scratch down`. See

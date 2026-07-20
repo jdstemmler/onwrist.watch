@@ -2,4 +2,9 @@ node_modules
 data
 docs
 .git
+.github
 .env
+.env.*
+.svelte-kit
+build
+.scratch-data

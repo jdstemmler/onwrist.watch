@@ -61,6 +61,20 @@ export const load: PageServerLoad = async ({ locals }) => {
 const err = (e: unknown) =>
 	e instanceof StateError ? fail(e.status, { message: e.message }) : (() => { throw e; })();
 
+// Server-side guard for datetime-local values: the browser's `required` is
+// the only client-side check, so a missing/garbage string would otherwise
+// ride localInputToUtc into an Invalid Date and blow up in the driver as a
+// 500. Bad input is a plain 400 instead.
+const DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+function parseLocalOrThrow(raw: FormDataEntryValue | null, homeTz: string): Date {
+	if (typeof raw !== 'string' || !DATETIME_LOCAL.test(raw)) {
+		throw new StateError('Enter a valid date and time', 400);
+	}
+	const d = localInputToUtc(raw, homeTz);
+	if (Number.isNaN(d.getTime())) throw new StateError('Enter a valid date and time', 400);
+	return d;
+}
+
 export const actions: Actions = {
 	putOn: async ({ request, locals }) => {
 		const f = await request.formData();
@@ -98,10 +112,8 @@ export const actions: Actions = {
 			requireVerified(locals.user!);
 			await createSession(await getDb(), locals.user!.id, {
 				watchId: Number(f.get('watch_id')),
-				startedAt: localInputToUtc(f.get('started_at') as string, homeTz),
-				endedAt: f.get('ended_at')
-					? localInputToUtc(f.get('ended_at') as string, homeTz)
-					: null,
+				startedAt: parseLocalOrThrow(f.get('started_at'), homeTz),
+				endedAt: f.get('ended_at') ? parseLocalOrThrow(f.get('ended_at'), homeTz) : null,
 				note: (f.get('note') as string) || undefined,
 				source: 'backfill'
 			});
@@ -130,12 +142,12 @@ export const actions: Actions = {
 				startedAt:
 					startedAtRaw === startedAtOrig
 						? undefined
-						: localInputToUtc(startedAtRaw, homeTz),
+						: parseLocalOrThrow(startedAtRaw, homeTz),
 				endedAt:
 					endedAtRaw === endedAtOrig
 						? undefined
 						: endedAtRaw
-							? localInputToUtc(endedAtRaw, homeTz)
+							? parseLocalOrThrow(endedAtRaw, homeTz)
 							: null,
 				note: (f.get('note') as string) || null
 			});
