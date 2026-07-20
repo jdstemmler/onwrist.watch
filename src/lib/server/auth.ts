@@ -115,6 +115,7 @@ export function routeClass(pathname: string): 'public' | 'protected' {
 		pathname === '/reset' ||
 		pathname === '/reset/confirm' ||
 		pathname === '/manifest.webmanifest' ||
+		pathname === '/privacy' ||
 		pathname === '/healthz' ||
 		pathname === '/favicon.ico' ||
 		pathname === '/apple-touch-icon.png'
