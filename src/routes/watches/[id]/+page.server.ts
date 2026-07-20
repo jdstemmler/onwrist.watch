@@ -1,10 +1,12 @@
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { and, desc, eq } from 'drizzle-orm';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
 import { watches, watchPhotos, wearSessions } from '$lib/server/db/schema';
 import { statsByWatch, statsByDow } from '$lib/server/stats';
-import { photoUrl } from '$lib/server/photos';
+import { photoUrl, savePhoto, setPrimaryPhoto } from '$lib/server/photos';
+import { requireVerified } from '$lib/server/auth';
+import { StateError } from '$lib/server/sessions';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const uid = locals.user!.id;
@@ -36,4 +38,26 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		dow: dowRows.filter((r) => r.watchId === id),
 		sessions
 	};
+};
+
+const err = (e: unknown) =>
+	e instanceof StateError ? fail(e.status, { message: e.message }) : (() => { throw e; })();
+
+export const actions: Actions = {
+	addPhoto: async ({ request, params, locals }) => {
+		const db = await getDb();
+		const f = await request.formData();
+		try {
+			requireVerified(locals.user!);
+			const photo = f.get('photo');
+			if (!(photo instanceof File) || photo.size === 0) {
+				return fail(400, { message: 'Choose a photo first' });
+			}
+			// savePhoto asserts ownership of the watch (assertWatchOwned) —
+			// no separate findWatch guard needed.
+			const saved = await savePhoto(db, locals.user!.id, Number(params.id), photo);
+			if (f.get('make_primary')) await setPrimaryPhoto(db, locals.user!.id, saved.id);
+		} catch (e) { return err(e); }
+		return { success: true };
+	}
 };
