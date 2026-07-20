@@ -37,7 +37,9 @@ describe('emailFormatError', () => {
 describe('argon2id hashing', () => {
 	it('control-1: hashes with OWASP argon2id parameters', async () => {
 		const h = await hashPassword('a strong enough pw');
-		expect(h.startsWith('$argon2id$v=19$m=19456,t=2,p=1$')).toBe(true);
+		// PHC param order is a serialization detail (argon2 0.45 reordered it) — assert the set
+		const params = h.match(/^\$argon2id\$v=19\$([^$]+)\$/)?.[1].split(',').sort();
+		expect(params).toEqual(['m=19456', 'p=1', 't=2']);
 		expect(await verifyPasswordHash(h, 'a strong enough pw')).toBe(true);
 		expect(await verifyPasswordHash(h, 'wrong password!')).toBe(false);
 	});
