@@ -90,8 +90,9 @@
 				<p class="nudge">⚠️ Still wearing this? Fix it in the timeline.</p>
 			{/if}
 
-			<dialog bind:this={picker} closedby="any" aria-label={data.state.wearing ? 'Swap to' : 'Put on'}>
-				<p class="dialog-kicker">{data.state.wearing ? 'Swap to' : 'Put on'}</p>
+			{#if data.state.watches.length > 0}
+			<dialog bind:this={picker} closedby="any" aria-labelledby="picker-title">
+				<p class="dialog-kicker" id="picker-title">{data.state.wearing ? 'Swap to' : 'Put on'}</p>
 				<form
 					method="POST"
 					action={data.state.wearing ? '?/swap' : '?/putOn'}
@@ -105,6 +106,7 @@
 				</form>
 				<button type="button" class="picker-cancel" onclick={() => picker?.close()}>Cancel</button>
 			</dialog>
+			{/if}
 		</section>
 
 		{#if data.allWatches.length > 0}
@@ -308,6 +310,9 @@
 		.rail {
 			position: sticky;
 			top: 1rem;
+			/* never pin content out of reach on short viewports */
+			max-height: calc(100dvh - 2rem);
+			overflow-y: auto;
 		}
 		.history h2 {
 			margin-top: 0;
