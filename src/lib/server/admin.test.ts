@@ -138,6 +138,26 @@ describe('deleteUser', () => {
 		const [adm] = await db.insert(users).values({ email: 'x@a.com', passwordHash: 'x', role: 'admin' }).returning();
 		await expect(deleteUser(db, adm.id, storage)).rejects.toThrow(StateError);
 	});
+
+	it('deletes rows before files: a failing storage still removes the user', async () => {
+		const storage = createFsStorage(root);
+		const [m] = await db.insert(users).values({ email: 'm@b.com', passwordHash: 'x' }).returning();
+		const [w] = await db.insert(watches).values({ userId: m.id, brand: 'A', model: 'B' }).returning();
+		await storage.put(`${m.id}/${w.id}/p.webp`, Buffer.alloc(10));
+		await db.insert(watchPhotos).values({ watchId: w.id, filePath: `${m.id}/${w.id}/p.webp` });
+
+		const failing = {
+			...storage,
+			delete: async () => {
+				throw new Error('storage down');
+			}
+		};
+
+		await expect(deleteUser(db, m.id, failing)).rejects.toThrow('storage down');
+		// Row-first ordering: the user (and cascaded rows) are gone even though
+		// file deletion failed — orphan files, never dangling rows.
+		expect((await db.select().from(users).where(eq(users.id, m.id))).length).toBe(0);
+	});
 });
 
 describe('setQuotaMultiplier', () => {

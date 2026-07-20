@@ -70,6 +70,14 @@ const DAY = 86_400_000;
 const anchor = new Date(Number(process.env.SEED_ANCHOR_MS ?? Date.now()));
 const startOfDay = (d: Date) => new Date(Math.floor(d.getTime() / DAY) * DAY);
 
+// The open session goes on at anchor − 3h. Generated history must end
+// before that: day-1 evening sessions can otherwise run past it (normal
+// days end up to ~06:30 UTC "today"; camping overnights even later) and
+// 409 the final putOn when seeding in the late evening or overnight.
+const openStart = new Date(anchor.getTime() - 3 * 3_600_000);
+const capMs = openStart.getTime() - 60_000;
+const clamp = (d: Date) => new Date(Math.min(d.getTime(), capMs));
+
 let sessions = 0;
 for (let daysAgo = 120; daysAgo >= 1; daysAgo--) {
 	if (rand() < 0.08) continue; // no-watch day
@@ -81,30 +89,32 @@ for (let daysAgo = 120; daysAgo >= 1; daysAgo--) {
 
 	if (rand() < 0.12) {
 		// midday swap: two back-to-back sessions
-		const mid = at(20, Math.floor(rand() * 60));
-		const end = at(29, Math.floor(rand() * 90)); // 9-10:30 PM Pacific
+		const mid = clamp(at(20, Math.floor(rand() * 60)));
+		const end = clamp(at(29, Math.floor(rand() * 90))); // 9-10:30 PM Pacific
+		if (mid <= start) continue; // whole day would collide with the open session
 		await createSession(db, seedUser.id, { watchId, startedAt: start, endedAt: mid, note });
-		await createSession(db, seedUser.id, {
-			watchId: pick(weighted.filter((i) => i !== watchId)),
-			startedAt: mid,
-			endedAt: end
-		});
+		if (end > mid) {
+			await createSession(db, seedUser.id, {
+				watchId: pick(weighted.filter((i) => i !== watchId)),
+				startedAt: mid,
+				endedAt: end
+			});
+		}
 	} else if (rand() < 0.04) {
 		// camping: worn overnight, off early next morning (before next day's ~6:30 AM start)
-		await createSession(db, seedUser.id, { watchId, startedAt: start, endedAt: at(37, 0), note: 'camping' });
+		const end = clamp(at(37, 0));
+		if (end <= start) continue;
+		await createSession(db, seedUser.id, { watchId, startedAt: start, endedAt: end, note: 'camping' });
 	} else {
-		await createSession(db, seedUser.id, {
-			watchId,
-			startedAt: start,
-			endedAt: at(28, Math.floor(rand() * 150)),
-			note
-		});
+		const end = clamp(at(28, Math.floor(rand() * 150)));
+		if (end <= start) continue;
+		await createSession(db, seedUser.id, { watchId, startedAt: start, endedAt: end, note });
 	}
 	sessions++;
 }
 
 // Currently wearing something (put on this morning).
-await putOn(db, seedUser.id, { watchId: ids[0], at: new Date(anchor.getTime() - 3 * 3_600_000), source: 'web' });
+await putOn(db, seedUser.id, { watchId: ids[0], at: openStart, source: 'web' });
 
 console.log(`Seeded ${ids.length} watches and ~${sessions} wear days (one session still open).`);
 await pool.end();
