@@ -15,10 +15,12 @@ usually within a few days.
 ## Scope notes for self-hosters
 
 - Only the latest commit on `main` is supported.
-- The threat model assumes the app is reachable **only** through a
-  Cloudflare tunnel (loopback-bound port, `CF-Connecting-IP` trusted for
-  rate limiting). If you expose the port directly, clear `ADDRESS_HEADER`
-  — see `.env.example`.
+- By default the app trusts the connecting socket's address for per-IP
+  rate limiting. If you front it with a proxy or tunnel, only set
+  `ADDRESS_HEADER` to a header the proxy **always overwrites** (e.g.
+  `CF-Connecting-IP` behind cloudflared) *and* make the proxy the only
+  path to the port (`BIND_ADDRESS=127.0.0.1`) — a spoofable header lets
+  clients forge rate-limit identities. See `.env.example`.
 - Account emails fall back to container stdout when `RESEND_API_KEY` is
   unset; those log lines contain live account-recovery links. Don't ship
   that configuration to real users.
