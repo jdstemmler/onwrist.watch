@@ -4,7 +4,12 @@ import { SESSION_COOKIE } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
 import { getMailer } from '$lib/server/mail';
 import { updatePrefs } from '$lib/server/users';
-import { changePassword, requestEmailChange, resendVerification } from '$lib/server/flows';
+import {
+	changePassword,
+	deleteAccount,
+	requestEmailChange,
+	resendVerification
+} from '$lib/server/flows';
 import { StateError } from '$lib/server/sessions';
 
 const IANA_TIME_ZONES = new Set(Intl.supportedValuesOf('timeZone'));
@@ -91,5 +96,24 @@ export const actions: Actions = {
 		const result = await resendVerification({ db: await getDb(), mailer: getMailer() }, locals.user!.id);
 		if (!result.ok) return fail(result.status, { action: 'resendVerify', message: result.message });
 		return { action: 'resendVerify', sent: true };
+	},
+
+	deleteAccount: async ({ request, locals, cookies }) => {
+		const form = await request.formData();
+		const currentPassword = (form.get('currentPassword') as string) ?? '';
+		const confirmEmail = (form.get('confirmEmail') as string) ?? '';
+
+		// The users-row cascade revokes every session; all that's left client-side
+		// is dropping the cookie and landing on the public page.
+		const result = await deleteAccount(
+			{ db: await getDb(), mailer: getMailer() },
+			locals.user!.id,
+			currentPassword,
+			confirmEmail
+		);
+		if (!result.ok) return fail(result.status, { action: 'deleteAccount', message: result.message });
+
+		cookies.delete(SESSION_COOKIE, { path: '/' });
+		redirect(303, '/');
 	}
 };

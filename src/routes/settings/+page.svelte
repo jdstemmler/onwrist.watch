@@ -108,6 +108,28 @@
 	</form>
 </fieldset>
 
+<fieldset class="danger-zone">
+	<legend>Delete account</legend>
+	<form method="POST" action="?/deleteAccount" use:enhance class="fields">
+		<p class="muted wide">
+			Deletes your account and everything in it — watches, wear history, and photos. This is
+			permanent.
+		</p>
+		{#if resultFor('deleteAccount')?.message}
+			<p class="error wide" role="alert">{resultFor('deleteAccount')?.message}</p>
+		{/if}
+		<label class="field"><span class="lbl">Current password</span>
+			<input type="password" name="currentPassword" autocomplete="current-password" required />
+		</label>
+		<label class="field"><span class="lbl">Type <span class="num">{data.email}</span> to confirm</span>
+			<input type="email" name="confirmEmail" autocomplete="off" required />
+		</label>
+		<div class="wide actions">
+			<button type="submit" class="danger">Delete account</button>
+		</div>
+	</form>
+</fieldset>
+
 <style>
 	.head {
 		display: flex;
@@ -218,6 +240,19 @@
 	.error {
 		color: var(--danger);
 		font-size: 0.85rem;
+		margin: 0;
+	}
+
+	.danger-zone {
+		border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+	}
+
+	.danger-zone legend {
+		color: var(--danger);
+		border-bottom-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+	}
+
+	.danger-zone .muted {
 		margin: 0;
 	}
 </style>

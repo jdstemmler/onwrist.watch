@@ -42,6 +42,16 @@ export function emailChangedNotice(to: string): Mail {
 	};
 }
 
+/** Goodbye notice after self-serve account deletion. No link — the account
+ * and everything in it are already gone. */
+export function accountDeletedEmail(to: string): Mail {
+	return {
+		to,
+		subject: `Your ${config.appName} account was deleted`,
+		text: `Your ${config.appName} account and all of its data were just deleted at your request.\n\nThis is permanent — watches, wear history, and photos are gone. You're welcome back anytime with a fresh signup.\n\nIf you didn't do this, contact support right away.`
+	};
+}
+
 /** Signup-collision side channel: sent instead of a verify email when the
  * address already has an account, so the response to signup is identical
  * either way. Says "sign in or reset" without revealing anything else. */

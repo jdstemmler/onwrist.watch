@@ -75,8 +75,9 @@
 	<section class="card">
 		<h2>Deleting your data</h2>
 		<p>
-			Ask the operator of your instance to delete your account — deletion removes every record
-			and photo file. Self-serve account deletion from the settings page is planned.
+			Delete your account yourself from the settings page — deletion is immediate and permanent,
+			and removes every record and photo file. You can also ask the operator of your instance to
+			delete it for you.
 		</p>
 	</section>
 </article>

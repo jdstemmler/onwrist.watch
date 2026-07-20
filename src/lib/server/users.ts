@@ -1,10 +1,11 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DB } from './db';
-import { users, emailTokens, type User } from './db/schema';
+import { users, emailTokens, watches, watchPhotos, type User } from './db/schema';
 import { emailKey, hashPassword } from './passwords';
 import { passwordPolicyError } from './password-policy';
-import { StateError } from './sessions';
+import { StateError, lockUser } from './sessions';
 import { revokeAllSessions } from './auth';
+import { getStorage, type PhotoStorage } from './storage';
 
 /** Normalizes the email, enforces the password policy, and hashes the
  * password. Role defaults to 'member' (schema default). A Postgres unique
@@ -70,6 +71,52 @@ export async function applyEmailChange(
 		.update(users)
 		.set({ email: emailKey(newEmail), emailVerifiedAt: now })
 		.where(eq(users.id, userId));
+}
+
+/** Self-serve account deletion. Refuses to remove the last admin — `/admin`
+ * would 404 forever with no recovery path. The users-row cascade drops
+ * watches / wear_sessions / watch_photos / auth_sessions / email_tokens;
+ * photo *files* go explicitly afterward, same rationale as deleteWatch: a
+ * crash in between leaves reclaimable orphaned files, never live rows
+ * pointing at missing files. */
+export async function deleteAccount(
+	db: DB,
+	userId: number,
+	storage: PhotoStorage = getStorage()
+): Promise<void> {
+	const photoKeys = await db.transaction(async (tx) => {
+		// Admins lock every admin row (ordered by id, so two concurrent admin
+		// self-deletions serialize instead of deadlocking) — otherwise both
+		// could pass the last-admin count and leave zero. Members take the
+		// ordinary per-user lock. The own row is locked either way, so this
+		// serializes with every other lockUser() mutation path. Reading the
+		// role unlocked first is sound: roles never change at runtime.
+		const user = await getUser(tx, userId);
+		if (!user) return [];
+		if (user.role === 'admin') {
+			const admins = await tx
+				.select({ id: users.id })
+				.from(users)
+				.where(eq(users.role, 'admin'))
+				.orderBy(users.id)
+				.for('update');
+			if (admins.length <= 1) {
+				throw new StateError("You're the last admin — this account can't be deleted", 400);
+			}
+		} else {
+			await lockUser(tx, userId);
+		}
+		const keys = (
+			await tx
+				.select({ filePath: watchPhotos.filePath })
+				.from(watchPhotos)
+				.innerJoin(watches, eq(watches.id, watchPhotos.watchId))
+				.where(eq(watches.userId, userId))
+		).map((p) => p.filePath);
+		await tx.delete(users).where(eq(users.id, userId));
+		return keys;
+	});
+	for (const key of photoKeys) await storage.delete(key);
 }
 
 export async function updatePrefs(
