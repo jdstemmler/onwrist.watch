@@ -1,0 +1,58 @@
+# Nightly off-platform backup of the production Postgres to Backblaze B2.
+#
+# Only runs in the flagship repo (guarded below); forks/self-hosters should
+# use the cron approach documented in docs/deploy.md instead.
+#
+# Required Actions secrets:
+#   BACKUP_DATABASE_URL  — Postgres URL reachable from GitHub runners
+#                          (Railway's DATABASE_PUBLIC_URL)
+#   B2_KEY_ID            — Backblaze application key ID, scoped to the
+#   B2_APP_KEY           — onwrist-backups bucket only
+name: backup
+
+on:
+  schedule:
+    - cron: '17 9 * * *' # daily, 09:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency: backup
+
+jobs:
+  dump:
+    if: github.repository == 'jdstemmler/onwrist.watch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%d-%H%M)"
+          echo "file=onwrist-${stamp}.sql.gz" >> "$GITHUB_ENV"
+          # pg_dump from the postgres:17 image so client >= server version
+          docker run --rm -e DATABASE_URL postgres:17-alpine \
+            pg_dump --no-password "$DATABASE_URL" | gzip > "onwrist-${stamp}.sql.gz"
+
+      - name: Sanity-check dump
+        run: |
+          set -euo pipefail
+          ls -l "$file"
+          # an empty/failed dump gzips to almost nothing; a real one has schema + data
+          test "$(stat -c%s "$file")" -gt 10240
+          gunzip -c "$file" | tail -5 | grep -q 'PostgreSQL database dump complete'
+
+      - name: Upload to B2 and prune old dumps
+        env:
+          RCLONE_CONFIG_B2_TYPE: b2
+          RCLONE_CONFIG_B2_ACCOUNT: ${{ secrets.B2_KEY_ID }}
+          RCLONE_CONFIG_B2_KEY: ${{ secrets.B2_APP_KEY }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends rclone
+          rclone copyto "$file" "b2:onwrist-backups/nightly/$file"
+          rclone delete --min-age 30d b2:onwrist-backups/nightly
+          echo "current backups:"
+          rclone ls b2:onwrist-backups/nightly

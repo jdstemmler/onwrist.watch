@@ -174,6 +174,11 @@ Sync the dump directory somewhere external (rclone to object storage, a
 second machine, anything), and rehearse a full restore (next section)
 against the scratch stack before you need it for real.
 
+If your Postgres is reachable from outside (a managed host rather than the
+compose stack), you can run the same dump from a scheduled CI job instead
+of host cron — see `.github/workflows/backup.yml` for a GitHub Actions
+example that dumps to Backblaze B2 with 30-day retention.
+
 ## Restore procedure
 
 1. Stop the app service (leave `db` up): `docker compose stop onwrist`.
