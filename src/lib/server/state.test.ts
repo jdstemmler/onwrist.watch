@@ -28,7 +28,8 @@ describe('getState', () => {
 		expect(s.wearing).toBeNull();
 		expect(s.valid_actions).toEqual(['put_on']);
 		expect(s.status_line).toBe('No watch on');
-		expect(s.watches.map((w) => w.id)).toEqual([speedy, datejust]); // sold Seiko excluded
+		// 'Rolex Datejust' < 'Speedy'; sold Seiko excluded
+		expect(s.watches.map((w) => w.id)).toEqual([datejust, speedy]);
 	});
 
 	it('wearing: swap/take_off valid, worn watch excluded from list', async () => {
@@ -47,24 +48,22 @@ describe('getState', () => {
 		expect(s.status_line).toBe('No watch on — took off Speedy at 10:13 PM');
 	});
 
-	it('orders watches by most recent wear', async () => {
-		// Local watches, not the shared speedy/datejust fixture: their
-		// insertion (id) order is deliberately the OPPOSITE of the recency
-		// order asserted below. Reusing speedy/datejust here would let the
-		// natural (unsorted) id-ascending order coincide with the
-		// recency-correct order, passing even with a no-op sort.
-		const older = (
+	it('orders watches alphabetically by label, ignoring wear recency', async () => {
+		// Insertion (id) order — speedy, datejust, tudor, nomos — differs from
+		// the alphabetical order asserted below, so a no-op sort (natural
+		// id-ascending order) cannot pass. Wear sessions are created most-recent
+		// on the Tudor to prove recency doesn't reorder the list.
+		const tudor = (
 			await db.insert(watches).values({ userId: alice, brand: 'Tudor', model: 'BB58' }).returning()
 		)[0].id;
-		const newer = (
+		const nomos = (
 			await db.insert(watches).values({ userId: alice, brand: 'Nomos', model: 'Tangente' }).returning()
 		)[0].id;
-		await createSession(db, alice, { watchId: older, startedAt: new Date('2026-07-10T15:00:00Z'), endedAt: new Date('2026-07-10T22:00:00Z') });
-		await createSession(db, alice, { watchId: newer, startedAt: new Date('2026-07-12T15:00:00Z'), endedAt: new Date('2026-07-12T22:00:00Z') });
+		await createSession(db, alice, { watchId: nomos, startedAt: new Date('2026-07-10T15:00:00Z'), endedAt: new Date('2026-07-10T22:00:00Z') });
+		await createSession(db, alice, { watchId: tudor, startedAt: new Date('2026-07-12T15:00:00Z'), endedAt: new Date('2026-07-12T22:00:00Z') });
 		const s = await getState(db, alice, TZ);
-		// `newer` has a higher id (inserted after `older`) yet must sort first —
-		// only true recency sorting, not insertion/id order, produces this.
-		expect(s.watches.map((w) => w.id)).toEqual([newer, older, speedy, datejust]);
+		// 'Nomos Tangente' < 'Rolex Datejust' < 'Speedy' < 'Tudor BB58'
+		expect(s.watches.map((w) => w.id)).toEqual([nomos, datejust, speedy, tudor]);
 	});
 
 	it('cross-tenant: getState shows none of another user\'s watches', async () => {

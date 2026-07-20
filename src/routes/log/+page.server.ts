@@ -54,7 +54,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const stale =
 		!!open && Date.now() - open.startedAt.getTime() > locals.user!.staleSessionHours * 3_600_000;
 	return { state, sessions, stale, quip, allWatches: state.wearing
-		? [...state.watches, { id: state.wearing.id, label: state.wearing.label }]
+		? [...state.watches, { id: state.wearing.id, label: state.wearing.label }].sort((a, b) =>
+				a.label.localeCompare(b.label)
+			)
 		: state.watches };
 };
 
