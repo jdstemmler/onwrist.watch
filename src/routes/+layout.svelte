@@ -33,6 +33,11 @@
 		</div>
 	{/if}
 {/if}
+{#if GATE_ROUTES.has(page.route.id ?? '')}
+	<header class="gate-header">
+		<a href="/">‹ {data.appName}</a>
+	</header>
+{/if}
 <main>{@render children()}</main>
 
 <style>
@@ -70,5 +75,19 @@
 
 	.unverified-banner .error {
 		color: var(--danger);
+	}
+
+	.gate-header {
+		padding: 1rem 1.25rem 0;
+	}
+
+	.gate-header a {
+		font-size: 0.85rem;
+		color: var(--fg-muted);
+		text-decoration: none;
+	}
+
+	.gate-header a:hover {
+		color: var(--accent);
 	}
 </style>
