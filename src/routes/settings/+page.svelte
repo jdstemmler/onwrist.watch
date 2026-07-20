@@ -46,7 +46,7 @@
 			<input type="password" name="currentPassword" autocomplete="current-password" required />
 		</label>
 		<label class="field"><span class="lbl">New password</span>
-			<input type="password" name="newPassword" autocomplete="new-password" required />
+			<input type="password" name="newPassword" autocomplete="new-password" minlength="10" required />
 		</label>
 		<div class="wide actions">
 			<button type="submit" class="primary">Change password</button>

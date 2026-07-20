@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withPending } from '$lib/pending';
 	import { onMount } from 'svelte';
 	import type { ActionData, PageData } from './$types';
 
@@ -29,7 +30,7 @@
 			<p class="lead">Check your inbox — we sent a link to verify your email.</p>
 			<a class="button primary" href="/login">Back to login</a>
 		{:else}
-			<form method="POST" use:enhance>
+			<form method="POST" use:enhance={withPending()}>
 				{#if form?.message}
 					<p class="error" role="alert">{form.message}</p>
 				{/if}
@@ -46,9 +47,10 @@
 				<input
 					type="password"
 					name="password"
-					placeholder="password"
+					placeholder="password (10+ characters)"
 					autocomplete="new-password"
 					aria-label="Password"
+					minlength="10"
 					required
 				/>
 				<div class="cf-turnstile" data-sitekey={data.turnstileSiteKey} data-theme={turnstileTheme}></div>
