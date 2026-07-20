@@ -67,7 +67,7 @@
 
 	<details>
 		<summary>Edit</summary>
-		<form method="POST" action="?/update" use:enhance class="edit-form">
+		<form method="POST" action="?/update" use:enhance class="edit-form" id={"edit-" + s.id}>
 			<input type="hidden" name="id" value={s.id} />
 			<!-- Original prefill strings, compared server-side so an unedited field
 			     falls through to the stored Date instead of being re-parsed (lossy
@@ -94,7 +94,6 @@
 				<span class="lbl">Note</span>
 				<textarea name="note" rows="2">{s.note ?? ''}</textarea>
 			</label>
-			<button type="submit" class="primary">Save</button>
 		</form>
 		<!-- The confirm must cancel inside the enhance callback: use:enhance
 		     replaces the native submit, so an onsubmit preventDefault() would
@@ -102,13 +101,17 @@
 		<form
 			method="POST"
 			action="?/delete"
+			id={"delete-" + s.id}
 			use:enhance={({ cancel }) => {
 				if (!confirm('Delete this session?')) cancel();
 			}}
 		>
 			<input type="hidden" name="id" value={s.id} />
-			<button type="submit" class="danger">Delete</button>
 		</form>
+		<div class="edit-actions">
+			<button type="submit" form={"edit-" + s.id} class="primary">Save</button>
+			<button type="submit" form={"delete-" + s.id} class="danger">Delete</button>
+		</div>
 	</details>
 </li>
 
@@ -148,18 +151,15 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-		margin: 0.75rem 0 0.5rem;
+		margin: 0.75rem 0 0;
 		max-width: 30rem;
 	}
-	.edit-form button {
-		align-self: flex-start;
+	.edit-actions {
+		display: flex;
+		gap: 0.6rem;
+		margin-top: 0.75rem;
+	}
+	.edit-actions button {
 		min-width: 8rem;
-	}
-	details > form:last-child {
-		margin-top: 0.5rem;
-	}
-	details > form:last-child button {
-		font-size: 0.85rem;
-		padding: 0.35rem 0.7rem;
 	}
 </style>
