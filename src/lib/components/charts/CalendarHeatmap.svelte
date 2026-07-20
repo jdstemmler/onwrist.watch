@@ -55,6 +55,10 @@
 		for (const d of days) {
 			if (!seen.has(d.month)) {
 				seen.add(d.month);
+				// A clamped start can put two month starts in adjacent columns
+				// (partial first month); the labels would overlap at one column
+				// of spacing, so keep only the later one.
+				if (out.length && d.col - out[out.length - 1].col < 2) out.pop();
 				out.push({ col: d.col, label: MONTHS[d.month] });
 			}
 		}
@@ -95,6 +99,8 @@
 
 	<div class="grid-scroll">
 		<svg
+			width={LEFT_PAD + colCount * STEP}
+			height={TOP_PAD + 7 * STEP}
 			viewBox="0 0 {LEFT_PAD + colCount * STEP} {TOP_PAD + 7 * STEP}"
 			role="img"
 			aria-label="Calendar heatmap of {year}, colored by the watch worn most that day"
@@ -164,9 +170,11 @@
 	.grid-scroll {
 		overflow-x: auto;
 	}
+	/* Natural size from the width/height attributes: cells stay 12px however
+	   short the span is — a stretched viewBox turns a two-week history into a
+	   handful of giant cells. Full years overflow into .grid-scroll instead. */
 	svg {
 		display: block;
-		min-width: 40rem;
 	}
 	.month,
 	.dow {
