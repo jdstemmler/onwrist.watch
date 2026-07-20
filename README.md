@@ -27,7 +27,7 @@ run with docker compose.
 ## Quickstart
 
 ```sh
-git clone https://github.com/jdstemmler/onwrist.watch.git && cd onwrist.watch
+git clone --branch production https://github.com/jdstemmler/onwrist.watch.git && cd onwrist.watch
 cp .env.example .env
 # edit .env — required:
 #   POSTGRES_PASSWORD  any strong value

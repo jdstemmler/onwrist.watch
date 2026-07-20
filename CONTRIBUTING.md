@@ -4,12 +4,14 @@ Thanks for your interest in onwrist!
 
 ## Workflow
 
-- Branch off `main`, open your PR into **`develop`**. CI (typecheck +
-  tests, `npm run check` / `npm test`) must pass before merge.
-- Releases are `develop` → `main` merge commits, cut by the maintainer;
-  `main` always reflects the released state.
-- Small docs-only fixes may PR directly into `main` at the maintainer's
-  discretion.
+- Branch off **`main`** and open your PR into **`main`** — that goes for
+  features, fixes, and docs alike. CI (typecheck + tests, `npm run check`
+  / `npm test`) must pass before merge.
+- `main` is the trunk and holds work that has not shipped yet. Merging
+  there does not deploy anything.
+- Releases are cut by the maintainer, who fast-forwards the `production`
+  branch to `main` and tags it `vX.Y.Z`. If you are running your own
+  instance, track the tags rather than `main`.
 
 ## Development
 

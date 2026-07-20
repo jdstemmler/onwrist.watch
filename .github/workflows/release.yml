@@ -1,0 +1,85 @@
+# Releases: fast-forward `production` to `main`.
+#
+# `main` is the trunk — every PR lands there and CI keeps it green.
+# `production` is a pointer at the commit currently deployed (Railway
+# watches it), so it only ever moves forward to a SHA that already passed
+# CI on `main`. That makes the push a fast-forward by construction: unlike
+# a reverse-sync, it cannot diverge and so cannot fail in a way that needs
+# reconciling by hand.
+#
+# Run it from the Actions tab. Compare main...production first to read the
+# exact diff you are about to ship.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to create, e.g. v0.2.0 (leave blank to skip)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Validated before anything moves: a bad tag caught after the
+      # fast-forward would leave production promoted but untagged.
+      # TAG goes through env, never straight into the run body — a dispatch
+      # input interpolated into shell is an injection vector.
+      - name: Check the tag
+        if: inputs.tag != ''
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag must look like v1.2.3 (got: $TAG)"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists."
+            exit 1
+          fi
+
+      # Refuse to ship a red trunk: the deployed SHA must be one CI passed.
+      - name: Require a green main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse origin/main)
+          conclusion=$(gh api "repos/${{ github.repository }}/commits/$sha/check-runs" \
+            --jq '[.check_runs[] | select(.name == "test")] | first | .conclusion')
+          echo "main is $sha, test check: ${conclusion:-none}"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::main has no successful 'test' check — not releasing."
+            exit 1
+          fi
+
+      # Fast-forward only. If this ever fails, production has commits main
+      # does not, which means something was pushed to it directly.
+      - name: Fast-forward production to main
+        run: |
+          if git merge-base --is-ancestor origin/production origin/main; then
+            git push origin origin/main:production
+          else
+            echo "::error::production is not an ancestor of main — reconcile by hand."
+            exit 1
+          fi
+
+      - name: Tag the release
+        if: inputs.tag != ''
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          git tag -a "$TAG" origin/main -m "$TAG"
+          git push origin "$TAG"
