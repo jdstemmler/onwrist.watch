@@ -54,14 +54,24 @@ function getDummyHash(): Promise<string> {
 	return dummyHash;
 }
 
-export type CookieOptions = { httpOnly: true; sameSite: 'lax'; path: '/'; maxAge: number };
+export type CookieOptions = {
+	httpOnly: true;
+	sameSite: 'lax';
+	path: '/';
+	secure: boolean;
+	maxAge: number;
+};
 
-/** Admin sessions are a fixed 24h; member sessions use config.sessionDays. */
+/** Admin sessions are a fixed 24h; member sessions use config.sessionDays.
+ * `secure` is pinned explicitly in production rather than trusting
+ * SvelteKit's URL-based default, so a misconfigured ORIGIN can't silently
+ * downgrade the session cookie to plain HTTP. */
 export function sessionCookieOptions(role: 'admin' | 'member'): CookieOptions {
 	return {
 		httpOnly: true,
 		sameSite: 'lax',
 		path: '/',
+		secure: process.env.NODE_ENV === 'production',
 		maxAge: (role === 'admin' ? 1 : config.sessionDays) * 86_400
 	};
 }

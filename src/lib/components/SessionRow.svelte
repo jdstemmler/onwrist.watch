@@ -12,17 +12,37 @@
 		endedLocal: string;
 	};
 
-	let { s, watches }: { s: Session; watches: { id: number; label: string }[] } = $props();
+	let {
+		s,
+		watches,
+		homeTz
+	}: { s: Session; watches: { id: number; label: string }[]; homeTz: string } = $props();
+
+	// A sold watch's sessions stay in the timeline but its watch is absent
+	// from the owned-watch dropdown — without its own entry the browser would
+	// auto-select the first option and Save would silently move the session
+	// onto a different watch.
+	const editWatches = $derived(
+		watches.some((w) => w.id === s.watchId) ? watches : [{ id: s.watchId, label: s.label }, ...watches]
+	);
+
+	// Times render in the user's homeTz (matching the edit-form prefills three
+	// lines below), not the server/device timezone.
+	const dayFmt = $derived(
+		new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: homeTz })
+	);
+	const timeFmt = $derived(
+		new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: homeTz })
+	);
 
 	function fmtRange(start: Date, end: Date | null): string {
-		const startStr = new Date(start).toLocaleString(undefined, {
-			month: 'short',
-			day: 'numeric',
-			hour: 'numeric',
-			minute: '2-digit'
-		});
+		const startStr = `${dayFmt.format(new Date(start))}, ${timeFmt.format(new Date(start))}`;
 		if (!end) return `${startStr} – now`;
-		const endStr = new Date(end).toLocaleString(undefined, { hour: 'numeric', minute: '2-digit' });
+		const e = new Date(end);
+		// Repeat the date on the end side when the session crosses local
+		// midnight, so "9:00 PM – 8:00 AM" can't read as a same-day range.
+		const sameDay = dayFmt.format(new Date(start)) === dayFmt.format(e);
+		const endStr = sameDay ? timeFmt.format(e) : `${dayFmt.format(e)}, ${timeFmt.format(e)}`;
 		return `${startStr} – ${endStr}`;
 	}
 
@@ -57,7 +77,7 @@
 			<label class="field">
 				<span class="lbl">Watch</span>
 				<select name="watch_id" required>
-					{#each watches as w (w.id)}
+					{#each editWatches as w (w.id)}
 						<option value={w.id} selected={w.id === s.watchId}>{w.label}</option>
 					{/each}
 				</select>
@@ -76,11 +96,15 @@
 			</label>
 			<button type="submit" class="primary">Save</button>
 		</form>
+		<!-- The confirm must cancel inside the enhance callback: use:enhance
+		     replaces the native submit, so an onsubmit preventDefault() would
+		     be ignored and Cancel would still delete. -->
 		<form
 			method="POST"
 			action="?/delete"
-			use:enhance
-			onsubmit={(e) => !confirm('Delete this session?') && e.preventDefault()}
+			use:enhance={({ cancel }) => {
+				if (!confirm('Delete this session?')) cancel();
+			}}
 		>
 			<input type="hidden" name="id" value={s.id} />
 			<button type="submit" class="danger">Delete</button>

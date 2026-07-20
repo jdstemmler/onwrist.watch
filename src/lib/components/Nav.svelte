@@ -68,10 +68,13 @@
 	</div>
 	{#if email}
 		<div class="menu" bind:this={menuEl}>
+			<!-- Disclosure pattern (aria-expanded only), not role="menu": menu
+			     roles promise arrow-key navigation and focus management this
+			     panel doesn't implement, which misleads screen-reader users.
+			     Plain links/buttons + Tab is honest and works. -->
 			<button
 				class="menu-trigger"
 				onclick={() => (menuOpen = !menuOpen)}
-				aria-haspopup="menu"
 				aria-expanded={menuOpen}
 				aria-label="Menu"
 			>
@@ -82,15 +85,14 @@
 				</svg>
 			</button>
 			{#if menuOpen}
-				<div class="menu-panel" role="menu">
-					<button class="item" role="menuitem" type="button" onclick={cycleTheme}>
+				<div class="menu-panel">
+					<button class="item" type="button" onclick={cycleTheme}>
 						<span class="glyph" aria-hidden="true">{GLYPH[theme]}</span>
 						Theme · {theme}
 					</button>
 					{#if isAdmin}
 						<a
 							class="item"
-							role="menuitem"
 							href="/admin"
 							onclick={() => (menuOpen = false)}
 							aria-current={page.url.pathname === '/admin' ? 'page' : undefined}>Admin</a
@@ -98,13 +100,12 @@
 					{/if}
 					<a
 						class="item"
-						role="menuitem"
 						href="/settings"
 						onclick={() => (menuOpen = false)}
 						aria-current={page.url.pathname === '/settings' ? 'page' : undefined}>Settings</a
 					>
 					<form method="POST" action="/login?/logout">
-						<button class="item danger" role="menuitem" type="submit">Log out</button>
+						<button class="item danger" type="submit">Log out</button>
 					</form>
 				</div>
 			{/if}
@@ -214,7 +215,9 @@
 		justify-content: center;
 		background: none;
 		border: none;
-		padding: 0.4rem 0.5rem;
+		/* pad the 4×16 glyph out to a finger-sized target */
+		padding: 0.75rem 0.9rem;
+		margin: -0.35rem -0.4rem;
 		border-radius: var(--radius);
 		color: var(--fg-muted);
 		cursor: pointer;

@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import type { Watch, WatchPhoto } from '$lib/server/db/schema';
+	import { photoUrl } from '$lib/watch-label';
 
 	let { watch, photos }: { watch?: Watch; photos?: WatchPhoto[] } = $props();
 
@@ -144,7 +145,7 @@
 			<ul class="photos">
 				{#each photos as p (p.id)}
 					<li class:primary={p.isPrimary}>
-						<img src="/photos/{p.filePath}" alt="" />
+						<img src={photoUrl(p.filePath)} alt="" />
 						{#if p.isPrimary}
 							<span class="badge">Primary</span>
 						{:else}

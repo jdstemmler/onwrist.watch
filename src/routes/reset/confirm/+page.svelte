@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withPending } from '$lib/pending';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -10,7 +11,7 @@
 </svelte:head>
 
 <div class="gate">
-	<form method="POST" use:enhance class="card">
+	<form method="POST" use:enhance={withPending()} class="card">
 		<p class="kicker"><span class="dot"></span>New password</p>
 		{#if form?.message}
 			<p class="error" role="alert">{form.message}</p>
@@ -20,9 +21,10 @@
 		<input
 			type="password"
 			name="password"
-			placeholder="new password"
+			placeholder="new password (10+ characters)"
 			autocomplete="new-password"
 			aria-label="New password"
+			minlength="10"
 			autofocus
 			required
 		/>

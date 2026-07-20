@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withPending } from '$lib/pending';
 	import SessionRow from '$lib/components/SessionRow.svelte';
 	import type { ActionData, PageData } from './$types';
 
@@ -36,12 +37,15 @@
 	const clearNotes = () => {
 		notes.putOn = notes.swap = notes.takeOff = '';
 	};
-	// after a successful action, reset pending notes along with the form
-	const submitAndClear = () =>
-		async ({ update }: { update: () => Promise<void> }) => {
-			await update();
-			clearNotes();
-		};
+	// after a successful action, reset pending notes along with the form;
+	// withPending disables the submitter while the request is in flight
+	const submitAndClear = withPending(
+		() =>
+			async ({ update }: { update: () => Promise<void> }) => {
+				await update();
+				clearNotes();
+			}
+	);
 </script>
 
 <svelte:head>
@@ -68,6 +72,14 @@
 	<p class="toast" role="alert">{form.message}</p>
 {/if}
 
+{#if data.state.watches.length === 0 && !data.state.wearing}
+	<!-- The PWA opens straight onto this page, so a brand-new account needs a
+	     first step here — not a required select with zero options. -->
+	<section class="logger card empty">
+		<p class="empty-lead">Add your first watch to start logging wear.</p>
+		<a class="button primary" href="/watches/new">Add a watch</a>
+	</section>
+{:else}
 <section class="logger card">
 	{#if data.state.valid_actions.includes('put_on')}
 		<form method="POST" action="?/putOn" use:enhance={submitAndClear} class="action-row">
@@ -164,10 +176,12 @@
 		</form>
 	{/if}
 </section>
+{/if}
 
+{#if data.allWatches.length > 0}
 <details class="card backfill">
 	<summary>Backfill a session…</summary>
-	<form method="POST" action="?/backfill" use:enhance>
+	<form method="POST" action="?/backfill" use:enhance={withPending()}>
 		<label class="field">
 			<span class="lbl">Watch</span>
 			<select name="watch_id" required>
@@ -191,13 +205,18 @@
 		<button type="submit" class="primary big">Add Session</button>
 	</form>
 </details>
+{/if}
 
 <h2>Timeline</h2>
-<ul class="timeline">
-	{#each data.sessions as s (s.id)}
-		<SessionRow {s} watches={data.allWatches} />
-	{/each}
-</ul>
+{#if data.sessions.length === 0}
+	<p class="muted timeline-empty">No sessions yet — they'll show up here as you log wear.</p>
+{:else}
+	<ul class="timeline">
+		{#each data.sessions as s (s.id)}
+			<SessionRow {s} watches={data.allWatches} homeTz={data.homeTz} />
+		{/each}
+	</ul>
+{/if}
 
 <style>
 	.banner {
@@ -268,6 +287,18 @@
 		max-width: 34rem;
 		margin-inline: auto;
 		padding: 0.75rem;
+	}
+	.logger.empty {
+		align-items: center;
+		text-align: center;
+		padding: 1.5rem 1rem;
+	}
+	.empty-lead {
+		margin: 0;
+		color: var(--fg-muted);
+	}
+	.timeline-empty {
+		margin: 0 0 2rem;
 	}
 	.action-row {
 		display: flex;

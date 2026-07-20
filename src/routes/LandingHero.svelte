@@ -141,9 +141,8 @@
 		height: auto;
 	}
 	/* base display lives on the toggle classes (not `.shot img`) so the
-	   `.shot-dark { display: none }` default isn't out-specificity'd by a
-	   `.shot img { display: block }` rule — that bug rendered BOTH images in
-	   light mode. */
+	   `.shot-dark { display: none }` default can't be out-specificity'd by a
+	   `.shot img { display: block }` rule (which would render both images). */
 	.shot-light,
 	.shot-dark {
 		display: block;

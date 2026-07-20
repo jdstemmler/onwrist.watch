@@ -1,26 +1,27 @@
 # onwrist
 
-(Repo renamed from "horolog" 2026-07-19; the checkout directory and the
-docker compose project name deliberately remain `horolog` — see the `name:`
-pin in `docker-compose.yml`.)
+Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session
+logging (installable PWA) + stats dashboard, with self-serve accounts. Runs
+as a SvelteKit app + Postgres via docker compose, typically behind a
+Cloudflare tunnel.
 
-Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session logging (installable PWA) + stats dashboard, with self-serve accounts. Runs as a SvelteKit app + Postgres via docker compose on a homelab behind cloudflared.
-
-- **Design spec:** `docs/superpowers/specs/2026-07-14-horolog-design.md` — the source of truth for scope and behavior.
-- **Implementation plan:** `docs/superpowers/plans/2026-07-14-horolog.md` — task-by-task with complete code; includes the unattended-run Execution Directive. If you're implementing, work from your assigned task's interface contract.
+Operator-local context (production guard, deploy specifics) lives in
+@CLAUDE.local.md — tracked in the private working repo only; if that import
+is missing you're in the public source release and there is no live
+deployment to be careful of.
 
 ## Commands
 
 - `docker compose -f docker-compose.scratch.yml -p onwrist-scratch up -d` then
   `env $(cat .env.scratch | xargs) npm run dev` — dev server on :5199 against
-  the disposable scratch Postgres (see production guard below)
+  the disposable scratch Postgres. All dev and runtime verification happens
+  on this stack, never the default compose project.
 - `npm test` — Vitest suite against PGlite (must be green before any commit)
 - `npm run check` — svelte-check / typecheck
-- `npm run db:generate` — generate Drizzle migration after schema changes (unchanged in purpose: run after editing `src/lib/server/db/schema.ts`)
+- `npm run db:generate` — generate Drizzle migration after schema changes (run after editing `src/lib/server/db/schema.ts`)
 - `npm run seed` — seed the scratch Postgres (one verified user + 12 watches + wear history; refuses non-empty DB). Account emails (verify/reset/change) are logged to the console, not sent, whenever `RESEND_API_KEY` is unset — the default for the scratch stack.
-- `docker compose up -d --build onwrist` — **deploy**: rebuild and recreate the live production app container on :3000 (run only as a deliberate deploy from `main` — see guard below)
 
-## Branching & deploy workflow
+## Branching workflow
 
 - **Major features:** branch off `main`, PR into `develop`, and let CI
   (typecheck + tests) pass there. When ready to ship, PR `develop` →
@@ -34,21 +35,7 @@ Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session log
   force-pushes — if it fails, `develop` has diverged from `main`
   (usually a squashed release PR); reconcile manually and keep using
   merge commits for `develop` → `main` releases.
-- Deploys always ship from `main`: on the homelab box, pull and
-  `docker compose up -d --build onwrist` (see "Routine deploys" in
-  `docs/deploy.md`).
-
-## Production guard
-
-Production is **live**: the default `docker compose` project (Postgres +
-app on :3000) serves real user data through the cloudflared tunnel — the
-legacy SQLite cutover completed in July 2026. Use the scratch harness
-(`docker-compose.scratch.yml`, project `onwrist-scratch`) for all dev and
-runtime verification — never bring up, restart, or run one-off commands
-against the production project except as a deliberate deploy from `main`,
-and never touch `data/` (live photo storage under `data/photos/`, plus the
-retained pre-cutover SQLite archive `data/watches.db`). See
-`docs/deploy.md` for topology, routine deploys, backup, and restore.
+- Deploys always ship from `main` (see "Routine deploys" in `docs/deploy.md`).
 
 ## Invariants (never violate; enforced in `src/lib/server/sessions.ts`)
 
@@ -65,6 +52,6 @@ retained pre-cutover SQLite archive `data/watches.db`). See
 - State-machine violations throw `StateError` → 409 with a human-readable `message`, shown verbatim as a dashboard toast — write it for a phone-sized screen.
 - Timestamps stored UTC (Drizzle `timestamp(..., { withTimezone: true, mode: 'date' })`); all DOW/TOD/calendar bucketing uses the signed-in user's `homeTz` preference (`locals.user.homeTz`, edited on `/settings`) via `src/lib/server/time.ts` — not a global config value. Money is integer cents.
 - Auth is roll-your-own, per-user accounts, not a shared password: argon2id password hashing, SHA-256-hashed email/session tokens, a Postgres-backed fixed-window rate limiter, and Turnstile on signup (`src/lib/server/auth.ts`, `passwords.ts`, `flows.ts`, `rate-limit.ts`, `turnstile.ts`; session populated onto `event.locals.user` in `hooks.server.ts`). Unverified users can log in but mutating actions are gated by `requireVerified()`. There is no REST API — the retired shortcut-facing `/api/*` surface is recoverable from git history if ever needed. Dashboard mutations are SvelteKit form actions calling the domain functions — don't add parallel REST endpoints.
-- Watch display name: `watchLabel()` (nickname, else brand + model). Don't reimplement.
+- Watch display name: `watchLabel()` in `src/lib/watch-label.ts` (nickname, else brand + model) — shared by server code and components. Don’t reimplement.
 - Admin (`/admin`) is an ops-only console, not a tenant feature: role-gated with a 404 (never 403) for non-admins so the surface's existence isn't disclosed to a signed-in member poking at the URL (`gate()` in `src/routes/admin/+page.server.ts`). Cross-tenant admin operations (list all users, disable/enable, delete, resend verification, quota) live in `src/lib/server/admin.ts`, never inline in route code. The admin account is seeded at boot from `ADMIN_EMAIL` (`ensureAdmin()`, called from `getDb()`) with an unusable random password hash — no separate invite flow; the operator sets a real password via the ordinary forgot-password/reset flow.
 - TDD for domain/stats/auth; UI is lightly tested and verified in the browser. Apply the frontend-design skill for UI work and the dataviz skill for charts.

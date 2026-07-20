@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withPending } from '$lib/pending';
 	import { page } from '$app/state';
 	import type { ActionData, PageData } from './$types';
 
@@ -19,7 +20,7 @@
 </svelte:head>
 
 <div class="gate">
-	<form method="POST" action="?/login" use:enhance class="card">
+	<form method="POST" action="?/login" use:enhance={withPending()} class="card">
 		<p class="kicker"><span class="dot"></span>Wrist check</p>
 		{#if flash}
 			<p class="success" role="status">{flash}</p>

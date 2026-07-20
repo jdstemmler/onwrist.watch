@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { eq } from 'drizzle-orm';
 import { createDb } from '../src/lib/server/db';
 import { users, watches } from '../src/lib/server/db/schema';
 import { createSession, putOn } from '../src/lib/server/sessions';
@@ -19,11 +18,13 @@ const pool = new Pool({
 const db = createDb(pool);
 await migrate(db, { migrationsFolder: 'drizzle' });
 
-const existingDemo = (await db.select({ id: users.id }).from(users).where(eq(users.isDemo, true)))[0];
-if (existingDemo) {
-	console.log('Demo user already exists — refusing to reseed. Reset the scratch DB to reseed.');
+// Scratch-only script: the demo account uses a fixed, public password, so
+// refuse any database that already has users — same guard as seed.ts. Run
+// against production this would mint a real known-credential account.
+if ((await db.select({ id: users.id }).from(users)).length > 0) {
+	console.error('Database is not empty — refusing to seed. Reset the scratch DB to reseed.');
 	await pool.end();
-	process.exit(0);
+	process.exit(1);
 }
 
 const [demoUser] = await db

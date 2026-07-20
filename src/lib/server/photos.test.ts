@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
 import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
-import { watchFormSchema, createWatch } from './watches';
+import { watchFormSchema, createWatch, deleteWatch } from './watches';
 import { users, watchPhotos } from './db/schema';
 import { savePhoto, deletePhoto, setPrimaryPhoto, getPhotoForUser } from './photos';
 import { createFsStorage } from './storage/fs';
@@ -133,6 +133,30 @@ describe('photos', () => {
 			const byId = new Map(rows.map((r) => [r.id, r]));
 			expect(byId.get(first.id)?.isPrimary).toBe(true);
 			expect(byId.get(second.id)?.isPrimary).toBe(false);
+		});
+	});
+
+	describe('deleteWatch photo files', () => {
+		it('deleting a watch removes its photo files, not just the cascaded rows', async () => {
+			// Files left behind would count against the storage quota forever
+			// (sizeOfPrefix walks the disk, and no row remains to delete them by).
+			const watch = await makeWatch(db, alice);
+			const photo = await savePhoto(db, alice, watch.id, await pngFile(400, 400), storage);
+			expect(await storage.sizeOfPrefix(`${alice}/`)).toBeGreaterThan(0);
+
+			await deleteWatch(db, alice, watch.id, storage);
+
+			expect(await storage.get(photo.filePath)).toBeNull();
+			expect(await storage.sizeOfPrefix(`${alice}/`)).toBe(0);
+		});
+
+		it("mallory's deleteWatch against alice's watch leaves the files alone", async () => {
+			const watch = await makeWatch(db, alice);
+			const photo = await savePhoto(db, alice, watch.id, await pngFile(400, 400), storage);
+
+			await deleteWatch(db, mallory, watch.id, storage);
+
+			expect(await storage.get(photo.filePath)).not.toBeNull();
 		});
 	});
 

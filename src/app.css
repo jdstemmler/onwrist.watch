@@ -250,3 +250,15 @@ button.danger,
 	box-shadow: var(--shadow);
 	padding: 1rem;
 }
+
+/* Motion here is decorative (hover lifts, short fades, the lume-dot glow) —
+   honor the OS-level request to keep still. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition-duration: 0.01ms !important;
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+	}
+}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import LandingHero from './LandingHero.svelte';
+	import { photoUrl } from '$lib/watch-label';
 	let { data } = $props();
 	const fmtDate = (iso: string | null) =>
 		iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'never';
@@ -28,7 +29,7 @@
 				<a class="card" href="/watches/{watch.id}">
 					<div class="photo">
 						{#if primaryPhoto}
-							<img src="/photos/{primaryPhoto}" alt={stats.label} loading="lazy" />
+							<img src={photoUrl(primaryPhoto)} alt={stats.label} loading="lazy" />
 						{:else}
 							<div class="ph" aria-hidden="true">
 								<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.4">

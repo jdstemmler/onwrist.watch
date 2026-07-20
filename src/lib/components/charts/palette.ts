@@ -1,15 +1,12 @@
-// Shared categorical color scale for the stats charts.
+// Shared categorical color scale for the stats charts: an 8-hue palette
+// tuned per theme, WCAG-contrast-checked against the card surfaces
+// (light #f7f8f4, dark #1b1f1c):
+//   light: slots 3/4/5 land at 2.0-2.6:1 — mitigated by always pairing a
+//   colored mark with a text label/legend, never color alone
+//   dark:  all slots >= 3.3:1
 //
-// This is the dataviz skill's documented default 8-hue categorical palette
-// (references/palette.md), validated with scripts/validate_palette.js against
-// onwrist's original card surfaces and re-checked numerically (WCAG contrast)
-// against the current steel surfaces (light #f7f8f4, dark #1b1f1c):
-//   light: PASS with contrast WARN on slots 3/4/5 (2.0-2.6:1) — mitigated by
-//   always pairing a colored mark with a text label/legend, never color alone
-//   dark:  all slots >= 3.3:1, PASS outright
-//
-// Order is the CVD-safety mechanism (worst adjacent normal-vision ΔE 19.6
-// light / 19.3 dark) — never re-cycle or reorder per-chart.
+// Order is the CVD-safety mechanism (adjacent slots keep a worst-case
+// normal-vision ΔE of ~19.5) — never re-cycle or reorder per-chart.
 export type ColorSlot = { light: string; dark: string };
 
 export const CATEGORICAL: ColorSlot[] = [

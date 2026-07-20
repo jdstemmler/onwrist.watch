@@ -46,6 +46,16 @@
 	</div>
 </section>
 
+{#if data.summary.sessions === 0}
+	<!-- Every chart would render its own flavor of empty; one clear message
+	     beats six bare axes. -->
+	<section class="card empty-state">
+		<p class="muted">
+			No wear sessions yet — stats appear once you
+			<a href="/log">log your first wear</a>.
+		</p>
+	</section>
+{:else}
 <section class="card">
 	<h2>Wrist-time share</h2>
 	<p class="muted">Total hours worn, all time.</p>
@@ -81,8 +91,17 @@
 	<p class="muted">Owned watches only.</p>
 	<RotationHealth byWatch={data.byWatch} nowIso={data.nowIso} {colorSlots} />
 </section>
+{/if}
 
 <style>
+	.empty-state {
+		text-align: center;
+		padding: 2rem 1rem;
+	}
+	.empty-state p {
+		margin: 0;
+	}
+
 	/* Single source of truth for the chart series palette — every chart
 	   component's root element carries class="chart-palette" and only
 	   references var(--series-N) (see slotVar() in
