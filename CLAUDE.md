@@ -2,8 +2,8 @@
 
 Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session
 logging (installable PWA) + stats dashboard, with self-serve accounts. Runs
-as a SvelteKit app + Postgres via docker compose, typically behind a
-Cloudflare tunnel.
+as a SvelteKit app + Postgres via docker compose, optionally behind a
+reverse proxy or Cloudflare tunnel.
 
 ## Commands
 
@@ -30,7 +30,7 @@ Cloudflare tunnel.
   force-pushes — if it fails, `develop` has diverged from `main`
   (usually a squashed release PR); reconcile manually and keep using
   merge commits for `develop` → `main` releases.
-- Deploys always ship from `main` (see "Routine deploys" in `docs/deploy.md`).
+- Releases ship from `main` (see "Routine updates" in `docs/deploy.md`).
 
 ## Invariants (never violate; enforced in `src/lib/server/sessions.ts`)
 
