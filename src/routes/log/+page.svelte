@@ -59,12 +59,44 @@
 		<p class="sub num">
 			since {fmtTime(data.state.wearing.since)} · {elapsed(data.state.wearing.since)}
 		</p>
+		{#if data.state.valid_actions.includes('take_off')}
+			<form
+				method="POST"
+				action="?/takeOff"
+				use:enhance={submitAndClear}
+				class="action-row banner-action"
+			>
+				<button type="submit" class="primary off">Take Off</button>
+				<button
+					type="button"
+					class="note-btn"
+					class:pending={notes.takeOff.length > 0}
+					title="Add a note"
+					aria-label="Add a note"
+					onclick={() => noteDialogs.takeOff?.showModal()}
+				>
+					&#9998;
+				</button>
+				<dialog bind:this={noteDialogs.takeOff} closedby="any">
+					<p class="dialog-kicker">Note — take off</p>
+					<textarea name="note" rows="3" placeholder="optional" bind:value={notes.takeOff}></textarea>
+					<div class="dialog-actions">
+						<button type="button" onclick={() => { notes.takeOff = ''; noteDialogs.takeOff?.close(); }}>
+							Clear
+						</button>
+						<button type="button" class="primary" onclick={() => noteDialogs.takeOff?.close()}>
+							Done
+						</button>
+					</div>
+				</dialog>
+			</form>
+		{/if}
 	{:else}
 		<p class="kicker"><span class="dot"></span>No watch on</p>
 		<h1 class="watch-name quip">{data.quip}</h1>
 	{/if}
 	{#if data.stale}
-		<p class="nudge">⚠️ Still wearing this? Fix below.</p>
+		<p class="nudge">⚠️ Still wearing this? Fix it in the timeline.</p>
 	{/if}
 </section>
 
@@ -82,23 +114,27 @@
 {:else}
 <section class="logger card">
 	{#if data.state.valid_actions.includes('put_on')}
-		<form method="POST" action="?/putOn" use:enhance={submitAndClear} class="action-row">
-			<select name="watch_id" required aria-label="Watch to put on">
-				{#each data.state.watches as w (w.id)}
-					<option value={w.id}>{w.label}</option>
-				{/each}
-			</select>
-			<button type="submit" class="primary">Put On</button>
-			<button
-				type="button"
-				class="note-btn"
-				class:pending={notes.putOn.length > 0}
-				title="Add a note"
-				aria-label="Add a note"
-				onclick={() => noteDialogs.putOn?.showModal()}
-			>
-				&#9998;
-			</button>
+		<form method="POST" action="?/putOn" use:enhance={submitAndClear} class="action-form">
+			<p class="kicker form-kicker">Put on</p>
+			<div class="action-row">
+				<select name="watch_id" required aria-label="Watch to put on">
+					<option value="" disabled selected>Pick a watch…</option>
+					{#each data.state.watches as w (w.id)}
+						<option value={w.id}>{w.label}</option>
+					{/each}
+				</select>
+				<button type="submit" class="primary">Put On</button>
+				<button
+					type="button"
+					class="note-btn"
+					class:pending={notes.putOn.length > 0}
+					title="Add a note"
+					aria-label="Add a note"
+					onclick={() => noteDialogs.putOn?.showModal()}
+				>
+					&#9998;
+				</button>
+			</div>
 			<dialog bind:this={noteDialogs.putOn} closedby="any">
 				<p class="dialog-kicker">Note — put on</p>
 				<textarea name="note" rows="3" placeholder="optional" bind:value={notes.putOn}></textarea>
@@ -115,23 +151,27 @@
 	{/if}
 
 	{#if data.state.valid_actions.includes('swap')}
-		<form method="POST" action="?/swap" use:enhance={submitAndClear} class="action-row">
-			<select name="watch_id" required aria-label="Watch to swap to">
-				{#each data.state.watches as w (w.id)}
-					<option value={w.id}>{w.label}</option>
-				{/each}
-			</select>
-			<button type="submit" class="primary">Swap</button>
-			<button
-				type="button"
-				class="note-btn"
-				class:pending={notes.swap.length > 0}
-				title="Add a note"
-				aria-label="Add a note"
-				onclick={() => noteDialogs.swap?.showModal()}
-			>
-				&#9998;
-			</button>
+		<form method="POST" action="?/swap" use:enhance={submitAndClear} class="action-form">
+			<p class="kicker form-kicker">Swap to</p>
+			<div class="action-row">
+				<select name="watch_id" required aria-label="Watch to swap to">
+					<option value="" disabled selected>Pick a watch…</option>
+					{#each data.state.watches as w (w.id)}
+						<option value={w.id}>{w.label}</option>
+					{/each}
+				</select>
+				<button type="submit" class="primary">Swap</button>
+				<button
+					type="button"
+					class="note-btn"
+					class:pending={notes.swap.length > 0}
+					title="Add a note"
+					aria-label="Add a note"
+					onclick={() => noteDialogs.swap?.showModal()}
+				>
+					&#9998;
+				</button>
+			</div>
 			<dialog bind:this={noteDialogs.swap} closedby="any">
 				<p class="dialog-kicker">Note — swap</p>
 				<textarea name="note" rows="3" placeholder="optional" bind:value={notes.swap}></textarea>
@@ -140,35 +180,6 @@
 						Clear
 					</button>
 					<button type="button" class="primary" onclick={() => noteDialogs.swap?.close()}>
-						Done
-					</button>
-				</div>
-			</dialog>
-		</form>
-	{/if}
-
-	{#if data.state.valid_actions.includes('take_off')}
-		<hr class="row-divider" />
-		<form method="POST" action="?/takeOff" use:enhance={submitAndClear} class="action-row">
-			<button type="submit" class="primary off">Take Off</button>
-			<button
-				type="button"
-				class="note-btn"
-				class:pending={notes.takeOff.length > 0}
-				title="Add a note"
-				aria-label="Add a note"
-				onclick={() => noteDialogs.takeOff?.showModal()}
-			>
-				&#9998;
-			</button>
-			<dialog bind:this={noteDialogs.takeOff} closedby="any">
-				<p class="dialog-kicker">Note — take off</p>
-				<textarea name="note" rows="3" placeholder="optional" bind:value={notes.takeOff}></textarea>
-				<div class="dialog-actions">
-					<button type="button" onclick={() => { notes.takeOff = ''; noteDialogs.takeOff?.close(); }}>
-						Clear
-					</button>
-					<button type="button" class="primary" onclick={() => noteDialogs.takeOff?.close()}>
 						Done
 					</button>
 				</div>
@@ -316,10 +327,18 @@
 	.action-row button.off {
 		flex: 1 1 auto;
 	}
-	.row-divider {
-		margin: 0.1rem 0;
-		border: none;
-		border-top: 1px solid var(--border);
+	.banner-action {
+		margin-top: 0.9rem;
+		max-width: 18rem;
+		margin-inline: auto;
+	}
+	.action-form {
+		display: flex;
+		flex-direction: column;
+	}
+	.form-kicker {
+		justify-content: flex-start;
+		margin-bottom: 0.45rem;
 	}
 	.note-btn {
 		flex: 0 0 2.5rem;
