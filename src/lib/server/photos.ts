@@ -3,27 +3,21 @@ import sharp from 'sharp';
 import type { DB } from './db';
 import { watches, watchPhotos, type WatchPhoto } from './db/schema';
 import { getStorage, type PhotoStorage } from './storage';
-import { StateError } from './sessions';
+import { StateError } from './errors';
+import { assertWatchOwned, lockUser } from './sessions';
 import { getUser } from './users';
+import { photoUrl } from '../watch-label';
+
+// Re-exported from its original home; new code imports from $lib/watch-label.
+export { photoUrl };
 
 const PHOTOS_PER_WATCH = 12;
 const STORAGE_BYTES = 1_073_741_824;
 
-export function photoUrl(filePath: string): string {
-	return `/photos/${filePath}`;
-}
-
-/** Throws (also covers not-found) unless `watchId` belongs to `userId`. */
-async function assertWatchOwned(db: DB, userId: number, watchId: number) {
-	const row = (
-		await db
-			.select({ id: watches.id })
-			.from(watches)
-			.where(and(eq(watches.id, watchId), eq(watches.userId, userId)))
-			.limit(1)
-	)[0];
-	if (!row) throw new StateError("That watch isn't yours");
-}
+// Explicit decode ceiling (sharp defaults to ~268MP): keeps a decompression
+// bomb — tiny file, huge declared dimensions — from ballooning memory before
+// the resize clamp gets a say. 64MP comfortably covers real phone photos.
+const MAX_INPUT_PIXELS = 64_000_000;
 
 export async function savePhoto(
 	db: DB,
@@ -42,7 +36,7 @@ export async function savePhoto(
 
 	let webp: Buffer;
 	try {
-		webp = await sharp(Buffer.from(await file.arrayBuffer()))
+		webp = await sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: MAX_INPUT_PIXELS })
 			.rotate()
 			.resize(2000, 2000, { fit: 'inside', withoutEnlargement: true })
 			.webp({ quality: 80 })
@@ -51,29 +45,35 @@ export async function savePhoto(
 		throw new StateError('Could not read that image — try a different photo');
 	}
 
-	const user = await getUser(db, userId);
-	const multiplier = user?.quotaMultiplier ?? 1;
+	// Quota checks and the insert serialize behind the user lock (same
+	// discipline as wear-session mutations) so concurrent uploads can't all
+	// pass the count/byte checks before any of them lands.
+	return await db.transaction(async (tx) => {
+		await lockUser(tx, userId);
+		const user = await getUser(tx, userId);
+		const multiplier = user?.quotaMultiplier ?? 1;
 
-	const existingPhotos = await db
-		.select({ id: watchPhotos.id })
-		.from(watchPhotos)
-		.where(eq(watchPhotos.watchId, watchId));
-	const photoQuota = PHOTOS_PER_WATCH * multiplier;
-	if (existingPhotos.length >= photoQuota) {
-		throw new StateError(`Photo limit reached (${photoQuota} per watch) — delete some photos first`);
-	}
+		const existingPhotos = await tx
+			.select({ id: watchPhotos.id })
+			.from(watchPhotos)
+			.where(eq(watchPhotos.watchId, watchId));
+		const photoQuota = PHOTOS_PER_WATCH * multiplier;
+		if (existingPhotos.length >= photoQuota) {
+			throw new StateError(`Photo limit reached (${photoQuota} per watch) — delete some photos first`);
+		}
 
-	const currentBytes = await storage.sizeOfPrefix(`${userId}/`);
-	if (webp.length + currentBytes > STORAGE_BYTES * multiplier) {
-		throw new StateError('Storage limit reached — delete some photos first');
-	}
+		const currentBytes = await storage.sizeOfPrefix(`${userId}/`);
+		if (webp.length + currentBytes > STORAGE_BYTES * multiplier) {
+			throw new StateError('Storage limit reached — delete some photos first');
+		}
 
-	const key = `${userId}/${watchId}/${crypto.randomUUID()}.webp`;
-	await storage.put(key, webp);
-	const isFirst = existingPhotos.length === 0;
-	return (
-		await db.insert(watchPhotos).values({ watchId, filePath: key, isPrimary: isFirst }).returning()
-	)[0];
+		const key = `${userId}/${watchId}/${crypto.randomUUID()}.webp`;
+		await storage.put(key, webp);
+		const isFirst = existingPhotos.length === 0;
+		return (
+			await tx.insert(watchPhotos).values({ watchId, filePath: key, isPrimary: isFirst }).returning()
+		)[0];
+	});
 }
 
 export async function deletePhoto(
@@ -91,8 +91,10 @@ export async function deletePhoto(
 			.limit(1)
 	)[0];
 	if (!p) return;
-	await storage.delete(p.filePath);
+	// Row first, file second: a crash in between orphans a file (benign,
+	// quota-inflating) instead of leaving a live row pointing at nothing.
 	await db.delete(watchPhotos).where(eq(watchPhotos.id, photoId));
+	await storage.delete(p.filePath);
 }
 
 /** Looks up a photo by its storage path, scoped to `userId` via the
@@ -121,6 +123,10 @@ export async function setPrimaryPhoto(db: DB, userId: number, photoId: number): 
 			.limit(1)
 	)[0];
 	if (!p) return;
-	await db.update(watchPhotos).set({ isPrimary: false }).where(eq(watchPhotos.watchId, p.watchId));
-	await db.update(watchPhotos).set({ isPrimary: true }).where(eq(watchPhotos.id, photoId));
+	// One transaction so a crash between the two updates can't leave the
+	// watch with zero primary photos.
+	await db.transaction(async (tx) => {
+		await tx.update(watchPhotos).set({ isPrimary: false }).where(eq(watchPhotos.watchId, p.watchId));
+		await tx.update(watchPhotos).set({ isPrimary: true }).where(eq(watchPhotos.id, photoId));
+	});
 }

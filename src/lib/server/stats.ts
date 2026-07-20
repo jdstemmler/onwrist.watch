@@ -6,15 +6,20 @@ import { zonedParts } from './time';
 
 export type HourSlice = { hour: number; dow: number; dayKey: string; minutes: number };
 
-const HOUR = 3_600_000;
-
 export function sliceSession(startedAt: Date, endedAt: Date, tz: string): HourSlice[] {
 	const out: HourSlice[] = [];
 	let cursor = startedAt.getTime();
 	const end = endedAt.getTime();
 	while (cursor < end) {
-		const bucketEnd = Math.min(end, (Math.floor(cursor / HOUR) + 1) * HOUR);
 		const p = zonedParts(new Date(cursor), tz);
+		// Advance to the next *local* hour boundary, not the next UTC one:
+		// for zones at :30/:45 offsets (India, Nepal, ...) UTC-hour slices
+		// would straddle two local hours — and local midnight — mislabeling
+		// hour/dow/dayKey for the tail of every slice. IANA offsets are all
+		// whole minutes, so UTC and local minute boundaries coincide and the
+		// remainder-into-the-minute can be taken from the UTC clock.
+		const msIntoMinute = cursor % 60_000;
+		const bucketEnd = Math.min(end, cursor + (60 - p.minute) * 60_000 - msIntoMinute);
 		out.push({ hour: p.hour, dow: p.dow, dayKey: p.dayKey, minutes: (bucketEnd - cursor) / 60_000 });
 		cursor = bucketEnd;
 	}
@@ -50,7 +55,10 @@ export async function statsByWatch(db: DB, userId: number, tz: string, now: Date
 				days.add(slice.dayKey);
 				minutes += slice.minutes;
 			}
-		const lastWornAt = mine.length ? mine[mine.length - 1].startedAt.toISOString() : null;
+		// "Last worn" is when the watch last came off the wrist (clamped `now`
+		// for a still-open session), not when it last went on — a week-long
+		// session shouldn't read as "worn 7 days ago" the day it ends.
+		const lastWornAt = mine.length ? mine[mine.length - 1].endedAt.toISOString() : null;
 		return {
 			watchId: w.id,
 			label: watchLabel(w),
@@ -116,11 +124,9 @@ export async function statsByTod(db: DB, userId: number, tz: string, now: Date) 
 	for (const s of sessions) putOnByHour[zonedParts(s.startedAt, tz).hour]++;
 
 	const minutesByHour = Array(24).fill(0);
-	const daysSeen = new Set<string>();
 	for (const s of clamped)
 		for (const slice of sliceSession(s.startedAt, s.endedAt, tz)) {
 			minutesByHour[slice.hour] += slice.minutes;
-			daysSeen.add(slice.dayKey);
 		}
 	const first = sessions[0];
 	const daysObserved = first

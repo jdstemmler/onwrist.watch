@@ -43,6 +43,21 @@ describe('sliceSession', () => {
 		expect(slices.map((s) => s.dayKey)).toEqual(['2026-07-13', '2026-07-14']);
 		expect(slices.map((s) => s.hour)).toEqual([23, 0]);
 	});
+
+	it('buckets on local hour boundaries in half-hour-offset zones (UTC+5:30)', () => {
+		// 23:40-00:20 IST July 14→15 = 18:10-18:50Z July 14: one UTC hour, but
+		// two local hours on two local days — slicing at UTC boundaries would
+		// collapse it into a single hour-23 July-14 slice.
+		const slices = sliceSession(
+			new Date('2026-07-14T18:10:00Z'),
+			new Date('2026-07-14T18:50:00Z'),
+			'Asia/Kolkata'
+		);
+		expect(slices).toEqual([
+			{ hour: 23, dow: 2, dayKey: '2026-07-14', minutes: 20 },
+			{ hour: 0, dow: 3, dayKey: '2026-07-15', minutes: 20 }
+		]);
+	});
 });
 
 describe('statsByWatch', () => {

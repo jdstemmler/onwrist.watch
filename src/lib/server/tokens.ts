@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, isNotNull, lt, or } from 'drizzle-orm';
 import type { DB } from './db';
 import { emailTokens, type EmailToken } from './db/schema';
 
@@ -48,4 +48,11 @@ export async function consumeToken(
 		)
 		.returning();
 	return rows[0] ?? null;
+}
+
+/** Deletes expired and already-used tokens — they can never be consumed
+ * again, they'd just accumulate forever. Called from the same login-time
+ * housekeeping as pruneSessions/pruneRateLimits. */
+export async function pruneTokens(db: DB, now = new Date()): Promise<void> {
+	await db.delete(emailTokens).where(or(lt(emailTokens.expiresAt, now), isNotNull(emailTokens.usedAt)));
 }
