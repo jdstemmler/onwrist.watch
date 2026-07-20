@@ -57,3 +57,27 @@ a pointer at the deployed commit.
 - Watch display name: `watchLabel()` in `src/lib/watch-label.ts` (nickname, else brand + model) — shared by server code and components. Don’t reimplement.
 - Admin (`/admin`) is an ops-only console, not a tenant feature: role-gated with a 404 (never 403) for non-admins so the surface's existence isn't disclosed to a signed-in member poking at the URL (`gate()` in `src/routes/admin/+page.server.ts`). Cross-tenant admin operations (list all users, disable/enable, delete, resend verification, quota) live in `src/lib/server/admin.ts`, never inline in route code. The admin account is seeded at boot from `ADMIN_EMAIL` (`ensureAdmin()`, called from `getDb()`) with an unusable random password hash — no separate invite flow; the operator sets a real password via the ordinary forgot-password/reset flow.
 - TDD for domain/stats/auth; UI is lightly tested and verified in the browser. Apply the frontend-design skill for UI work and the dataviz skill for charts.
+
+## Public-repo hygiene
+
+This repo is public — files, commit messages, PR descriptions, and issues
+are all part of the public record. Write every one of them for an outside
+reader.
+
+- Never commit: `.env` files or any real credential, token, or connection
+  string; operator-specific values (storage bucket names, account emails,
+  hostnames beyond onwrist.watch, IPs, tunnel/service IDs); absolute local
+  paths (`/home/...`, `/Users/...`); database dumps, logs, or pasted
+  terminal output that could contain any of the above.
+- Planning documents, specs, run reports, agent kickoff/handoff notes, and
+  AI-session links don't belong here — not as files, not quoted in commit
+  messages or PR text. Operator-local context lives in `CLAUDE.local.md`
+  (gitignored by design).
+- Commit messages: no session URLs, no agent/worktree branch names, no
+  redaction narration ("removed X's email" tells readers what existed).
+- Docs stay instance-neutral: describe what the software does, not how any
+  particular instance is operated. Examples use placeholders
+  (`you@example.com`, `/path/to/backups`, `192.168.1.50`).
+- When unsure, leave it out and note it in `CLAUDE.local.md` instead —
+  adding text to the repo later is trivial; removing it from public
+  history is not.
