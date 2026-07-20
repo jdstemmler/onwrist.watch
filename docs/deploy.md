@@ -176,8 +176,11 @@ against the scratch stack before you need it for real.
 
 If your Postgres is reachable from outside (a managed host rather than the
 compose stack), you can run the same dump from a scheduled CI job instead
-of host cron — see `.github/workflows/backup.yml` for a GitHub Actions
-example that dumps to Backblaze B2 with 30-day retention.
+of host cron — `.github/workflows/backup.yml` dumps to Backblaze B2 with
+30-day retention. It's opt-in per repository: the job only runs when the
+`B2_BUCKET` Actions variable is set, so a fork enables it by setting that
+variable plus the three secrets the workflow's header documents
+(`BACKUP_DATABASE_URL`, `B2_KEY_ID`, `B2_APP_KEY`).
 
 ## Restore procedure
 
