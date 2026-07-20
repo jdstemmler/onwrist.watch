@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	const firstYear = firstDayKey ? Number(firstDayKey.slice(0, 4)) : todayParts.year;
 	const requested = Number(url.searchParams.get('year') ?? todayParts.year);
 	const year = Number.isFinite(requested)
-		? Math.min(Math.max(requested, firstYear), todayParts.year)
+		? Math.min(Math.max(Math.trunc(requested), firstYear), todayParts.year)
 		: todayParts.year;
 	const [byWatch, byDow, byTod, todByWatch, calendar] = await Promise.all([
 		statsByWatch(db, uid, tz, now),

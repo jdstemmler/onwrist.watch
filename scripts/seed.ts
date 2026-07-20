@@ -74,6 +74,9 @@ const startOfDay = (d: Date) => new Date(Math.floor(d.getTime() / DAY) * DAY);
 // before that: day-1 evening sessions can otherwise run past it (normal
 // days end up to ~06:30 UTC "today"; camping overnights even later) and
 // 409 the final putOn when seeding in the late evening or overnight.
+// The per-branch `<= start` guards below are a safety net for future
+// changes to the day-shape constants — under the current 14h starts they
+// can't fire (the cap always sits well past any start).
 const openStart = new Date(anchor.getTime() - 3 * 3_600_000);
 const capMs = openStart.getTime() - 60_000;
 const clamp = (d: Date) => new Date(Math.min(d.getTime(), capMs));
