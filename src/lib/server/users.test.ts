@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { DB } from './db';
 import { createTestDb } from './db/test-utils';
-import { users } from './db/schema';
+import { users, watches, watchPhotos, wearSessions } from './db/schema';
 import { StateError } from './sessions';
 import { createSession, validateSession } from './auth';
 import { issueToken, consumeToken, TTL } from './tokens';
+import { watchFormSchema, createWatch } from './watches';
+import type { PhotoStorage } from './storage';
 import {
 	createUser,
 	findUserByEmail,
@@ -13,7 +15,8 @@ import {
 	markVerified,
 	setPassword,
 	applyEmailChange,
-	updatePrefs
+	updatePrefs,
+	deleteAccount
 } from './users';
 
 let db: DB;
@@ -107,6 +110,104 @@ describe('applyEmailChange', () => {
 		const row = await getUser(db, created.id);
 		expect(row?.email).toBe('new@address.com');
 		expect(row?.emailVerifiedAt?.getTime()).toBe(now.getTime());
+	});
+});
+
+function recordingStorage(): PhotoStorage & { deleted: string[] } {
+	const deleted: string[] = [];
+	return {
+		kind: 'fs',
+		deleted,
+		async put() {},
+		async get() {
+			return null;
+		},
+		async delete(key: string) {
+			deleted.push(key);
+		},
+		async sizeOfPrefix() {
+			return 0;
+		}
+	};
+}
+
+describe('deleteAccount', () => {
+	async function seedTenant(email: string) {
+		const user = await createUser(db, email, 'correct-horse-battery');
+		const watch = await createWatch(
+			db,
+			user.id,
+			watchFormSchema.parse({ brand: 'Seiko', model: 'SKX007', status: 'owned' })
+		);
+		const photoKey = `${user.id}/${watch.id}/photo.webp`;
+		await db.insert(watchPhotos).values({ watchId: watch.id, filePath: photoKey, isPrimary: true });
+		await db.insert(wearSessions).values({
+			watchId: watch.id,
+			startedAt: new Date('2026-07-01T00:00:00Z'),
+			endedAt: new Date('2026-07-01T08:00:00Z'),
+			source: 'web'
+		});
+		return { user, watch, photoKey };
+	}
+
+	it("deletes the user's rows and exactly their photo files; the other tenant is untouched", async () => {
+		const alice = await seedTenant('alice@b.com');
+		const bob = await seedTenant('bob@b.com');
+		const storage = recordingStorage();
+
+		await deleteAccount(db, alice.user.id, storage);
+
+		expect(await getUser(db, alice.user.id)).toBeNull();
+		expect(await db.select().from(watches).where(eq(watches.userId, alice.user.id))).toHaveLength(0);
+		expect(storage.deleted).toEqual([alice.photoKey]);
+
+		// Bob's world is intact: row, watch, photo row, wear session, file untouched.
+		expect(await getUser(db, bob.user.id)).not.toBeNull();
+		expect(await db.select().from(watches).where(eq(watches.userId, bob.user.id))).toHaveLength(1);
+		expect(
+			await db.select().from(watchPhotos).where(eq(watchPhotos.watchId, bob.watch.id))
+		).toHaveLength(1);
+		expect(
+			await db.select().from(wearSessions).where(eq(wearSessions.watchId, bob.watch.id))
+		).toHaveLength(1);
+		expect(storage.deleted).not.toContain(bob.photoKey);
+	});
+
+	it('revokes sessions via the cascade and frees the email for a fresh signup', async () => {
+		const alice = await seedTenant('alice@b.com');
+		const token = await createSession(db, alice.user.id);
+
+		await deleteAccount(db, alice.user.id, recordingStorage());
+
+		expect(await validateSession(db, token)).toBeNull();
+		const again = await createUser(db, 'alice@b.com', 'correct-horse-battery');
+		expect(again.email).toBe('alice@b.com');
+	});
+
+	it('refuses to delete the last admin', async () => {
+		const adm = await createUser(db, 'admin@b.com', 'correct-horse-battery');
+		await db.update(users).set({ role: 'admin' }).where(eq(users.id, adm.id));
+
+		await expect(deleteAccount(db, adm.id, recordingStorage())).rejects.toBeInstanceOf(StateError);
+		expect(await getUser(db, adm.id)).not.toBeNull();
+	});
+
+	it('lets a non-last admin self-delete', async () => {
+		const a1 = await createUser(db, 'admin1@b.com', 'correct-horse-battery');
+		const a2 = await createUser(db, 'admin2@b.com', 'correct-horse-battery');
+		await db.update(users).set({ role: 'admin' }).where(eq(users.id, a1.id));
+		await db.update(users).set({ role: 'admin' }).where(eq(users.id, a2.id));
+
+		await deleteAccount(db, a1.id, recordingStorage());
+
+		expect(await getUser(db, a1.id)).toBeNull();
+		expect(await getUser(db, a2.id)).not.toBeNull();
+	});
+
+	it('is a no-op for a missing user', async () => {
+		const storage = recordingStorage();
+		await deleteAccount(db, 9999, storage);
+		expect(storage.deleted).toHaveLength(0);
 	});
 });
 

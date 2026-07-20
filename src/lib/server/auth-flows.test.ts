@@ -20,6 +20,7 @@ import {
 	requestEmailChange,
 	resendVerification,
 	changePassword,
+	deleteAccount,
 	sessionCookieOptions,
 	type FlowDeps,
 	type CaptchaDeps
@@ -556,6 +557,59 @@ describe('happy path: signup -> verify -> login', () => {
 			'7.7.7.8'
 		);
 		expect(loginResult.ok).toBe(true);
+	});
+});
+
+describe('deleteAccount', () => {
+	it('roundtrip: verifies password + typed email, deletes the account, sends the goodbye notice', async () => {
+		const user = await createUser(db, 'a@b.com', 'the-old-password1');
+		const { createSession } = await import('./auth');
+		const session = await createSession(db, user.id, T0);
+
+		const result = await deleteAccount(deps, user.id, 'the-old-password1', '  A@B.COM ');
+		expect(result).toEqual({ ok: true });
+		expect(await getUser(db, user.id)).toBeNull();
+		expect(await validateSession(db, session, T0)).toBeNull();
+		expect(mailer.sent).toHaveLength(1);
+		expect(mailer.sent[0].to).toBe('a@b.com');
+		expect(mailer.sent[0].subject).toMatch(/deleted/i);
+	});
+
+	it('rejects a wrong current password and leaves the account intact', async () => {
+		const user = await createUser(db, 'a@b.com', 'the-old-password1');
+		const result = await deleteAccount(deps, user.id, 'totally-wrong', 'a@b.com');
+		expect(result).toEqual({ ok: false, status: 401, message: expect.any(String) });
+		expect(await getUser(db, user.id)).not.toBeNull();
+		expect(mailer.sent).toHaveLength(0);
+	});
+
+	it("rejects when the typed email doesn't match the account", async () => {
+		const user = await createUser(db, 'a@b.com', 'the-old-password1');
+		const result = await deleteAccount(deps, user.id, 'the-old-password1', 'wrong@b.com');
+		expect(result).toEqual({ ok: false, status: 400, message: expect.any(String) });
+		expect(await getUser(db, user.id)).not.toBeNull();
+	});
+
+	it('maps the last-admin refusal to a flow error instead of throwing', async () => {
+		const user = await createUser(db, 'admin@b.com', 'the-old-password1');
+		await db.update(users).set({ role: 'admin' }).where(eq(users.id, user.id));
+
+		const result = await deleteAccount(deps, user.id, 'the-old-password1', 'admin@b.com');
+		expect(result.ok).toBe(false);
+		if (result.ok) throw new Error('unreachable');
+		expect(result.status).toBe(400);
+		expect(await getUser(db, user.id)).not.toBeNull();
+	});
+
+	it('rate-limits attempts per account with a 429, protecting the password re-verify', async () => {
+		const user = await createUser(db, 'a@b.com', 'the-old-password1');
+		for (let i = 0; i < LIMITS.accountDelete.max; i++) {
+			const r = await deleteAccount(deps, user.id, 'totally-wrong', 'a@b.com');
+			expect(r).toEqual({ ok: false, status: 401, message: expect.any(String) });
+		}
+		const overLimit = await deleteAccount(deps, user.id, 'the-old-password1', 'a@b.com');
+		expect(overLimit).toEqual({ ok: false, status: 429, message: expect.any(String) });
+		expect(await getUser(db, user.id)).not.toBeNull();
 	});
 });
 

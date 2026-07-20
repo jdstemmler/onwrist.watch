@@ -6,7 +6,8 @@ import {
 	resetEmail,
 	emailChangeVerify,
 	emailChangedNotice,
-	accountExistsEmail
+	accountExistsEmail,
+	accountDeletedEmail
 } from './mail/templates';
 import { config } from './config';
 import { emailKey, emailFormatError, hashPassword, verifyPasswordHash } from './passwords';
@@ -18,7 +19,8 @@ import {
 	markVerified,
 	setPassword,
 	applyEmailChange,
-	isUniqueViolation
+	isUniqueViolation,
+	deleteAccount as deleteAccountData
 } from './users';
 import { issueToken, consumeToken, TTL } from './tokens';
 import { createSession, revokeSession } from './auth';
@@ -325,5 +327,41 @@ export async function changePassword(
 		if (e instanceof StateError) return { ok: false, status: e.status, message: e.message };
 		throw e;
 	}
+	return { ok: true };
+}
+
+/** Self-serve account deletion (settings danger zone): rate-limited per
+ * account, requires re-verifying the password AND retyping the account
+ * email. The users-row cascade revokes every session — the caller (the
+ * settings route) clears the cookie and bounces to the landing page. The
+ * goodbye notice is fire-and-forget like every other send. */
+export async function deleteAccount(
+	deps: FlowDeps,
+	userId: number,
+	currentPassword: string,
+	confirmEmail: string
+): Promise<{ ok: true } | FlowError> {
+	const { db, mailer, now } = deps;
+
+	if (!(await rateLimit(db, 'accountDelete', `acctdelete:acct:${userId}`, now))) {
+		return { ok: false, status: 429, message: RATE_LIMIT_MESSAGE };
+	}
+
+	const user = await getUser(db, userId);
+	if (!user || !(await verifyPasswordHash(user.passwordHash, currentPassword))) {
+		return { ok: false, status: 401, message: 'Current password is wrong' };
+	}
+
+	if (emailKey(confirmEmail) !== user.email) {
+		return { ok: false, status: 400, message: 'Type your account email exactly to confirm' };
+	}
+
+	try {
+		await deleteAccountData(db, userId);
+	} catch (e) {
+		if (e instanceof StateError) return { ok: false, status: e.status, message: e.message };
+		throw e;
+	}
+	sendAsync(mailer, accountDeletedEmail(user.email));
 	return { ok: true };
 }
