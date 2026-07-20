@@ -1,8 +1,7 @@
-# Pin the compose project name. It must stay "horolog" (historically derived
-# from the checkout directory) — changing it would detach the stack from the
-# live production resources, most critically the horolog_pgdata volume, and
-# `up` would create fresh empty ones.
-name: horolog
+# Pin the compose project name so container/volume names don't depend on the
+# checkout directory. Don't change it once deployed: the database volume is
+# named after it (onwrist_pgdata), and a renamed project starts a fresh one.
+name: onwrist
 
 services:
   db:
@@ -22,23 +21,24 @@ services:
   onwrist:
     build: .
     ports:
-      # Loopback-only by default: cloudflared runs on the same host and is
-      # the sole intended path in. Binding 0.0.0.0 would let LAN clients skip
-      # the tunnel (and spoof rate-limit identities once ADDRESS_HEADER is
-      # trusted). LAN-only deploys without a tunnel: set BIND_ADDRESS=0.0.0.0.
-      - "${BIND_ADDRESS:-127.0.0.1}:3000:3000"
+      # Reachable from your network by default. Hardening for a Cloudflare
+      # tunnel on the same host: set BIND_ADDRESS=127.0.0.1 so the tunnel is
+      # the only way in (pair it with ADDRESS_HEADER below).
+      - "${BIND_ADDRESS:-0.0.0.0}:3000:3000"
     environment:
       DATABASE_URL: postgres://onwrist:${POSTGRES_PASSWORD}@db:5432/onwrist
       SESSION_DAYS: ${SESSION_DAYS:-30}
       APP_NAME: ${APP_NAME:-onwrist}
-      # Client IP for the per-IP rate limits. Behind cloudflared every request
-      # arrives from the tunnel's socket, so without this header all visitors
-      # share one bucket — 10 failed logins by anyone would lock out login for
-      # everyone. Cloudflare always overwrites CF-Connecting-IP, so it's safe
-      # to trust as long as the port stays loopback-bound (above). NOT behind
-      # Cloudflare? Set ADDRESS_HEADER= (empty) or requests will 500 —
-      # adapter-node throws when the configured header is missing.
-      ADDRESS_HEADER: ${ADDRESS_HEADER-CF-Connecting-IP}
+      # Client IP for the per-IP rate limits. Empty (the default) = use the
+      # connecting socket's address — correct whenever clients reach the port
+      # directly. Behind a proxy/tunnel every request arrives from the proxy's
+      # socket instead, collapsing all visitors into one rate-limit bucket —
+      # set the header your proxy guarantees (cloudflared: CF-Connecting-IP)
+      # and make the proxy the only path in (BIND_ADDRESS=127.0.0.1 above).
+      # Only trust a header your proxy always overwrites: adapter-node 500s
+      # if the configured header is missing, and a spoofable one lets clients
+      # forge rate-limit identities.
+      ADDRESS_HEADER: ${ADDRESS_HEADER:-}
       # adapter-node caps request bodies at 512K by default — far below a
       # phone photo. Governs the photo-upload forms.
       BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-25M}
