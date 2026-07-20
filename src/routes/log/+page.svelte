@@ -52,182 +52,188 @@
 	<title>Wear Log — {data.appName}</title>
 </svelte:head>
 
-<section class="banner card" class:stale={data.stale}>
-	{#if data.state.wearing}
-		<p class="kicker"><span class="dot on"></span>On wrist</p>
-		<h1 class="watch-name">{data.state.wearing.label}</h1>
-		<p class="sub num">
-			since {fmtTime(data.state.wearing.since)} · {elapsed(data.state.wearing.since)}
-		</p>
-		{#if data.state.valid_actions.includes('take_off')}
-			<form
-				method="POST"
-				action="?/takeOff"
-				use:enhance={submitAndClear}
-				class="action-row banner-action"
-			>
-				<button type="submit" class="primary off">Take Off</button>
-				<button
-					type="button"
-					class="note-btn"
-					class:pending={notes.takeOff.length > 0}
-					title="Add a note"
-					aria-label="Add a note"
-					onclick={() => noteDialogs.takeOff?.showModal()}
-				>
-					&#9998;
-				</button>
-				<dialog bind:this={noteDialogs.takeOff} closedby="any">
-					<p class="dialog-kicker">Note — take off</p>
-					<textarea name="note" rows="3" placeholder="optional" bind:value={notes.takeOff}></textarea>
-					<div class="dialog-actions">
-						<button type="button" onclick={() => { notes.takeOff = ''; noteDialogs.takeOff?.close(); }}>
-							Clear
-						</button>
-						<button type="button" class="primary" onclick={() => noteDialogs.takeOff?.close()}>
-							Done
-						</button>
-					</div>
-				</dialog>
-			</form>
-		{/if}
-	{:else}
-		<p class="kicker"><span class="dot"></span>No watch on</p>
-		<h1 class="watch-name quip">{data.quip}</h1>
-	{/if}
-	{#if data.stale}
-		<p class="nudge">⚠️ Still wearing this? Fix it in the timeline.</p>
-	{/if}
-</section>
-
 {#if form?.message}
 	<p class="toast" role="alert">{form.message}</p>
 {/if}
 
-{#if data.state.watches.length === 0 && !data.state.wearing}
-	<!-- The PWA opens straight onto this page, so a brand-new account needs a
-	     first step here — not a required select with zero options. -->
-	<section class="logger card empty">
-		<p class="empty-lead">Add your first watch to start logging wear.</p>
-		<a class="button primary" href="/watches/new">Add a watch</a>
-	</section>
-{:else}
-<section class="logger card">
-	{#if data.state.valid_actions.includes('put_on')}
-		<form method="POST" action="?/putOn" use:enhance={submitAndClear} class="action-form">
-			<p class="kicker form-kicker">Put on</p>
-			<div class="action-row">
-				<select name="watch_id" required aria-label="Watch to put on">
-					<option value="" disabled selected>Pick a watch…</option>
-					{#each data.state.watches as w (w.id)}
-						<option value={w.id}>{w.label}</option>
-					{/each}
-				</select>
-				<button type="submit" class="primary">Put On</button>
-				<button
-					type="button"
-					class="note-btn"
-					class:pending={notes.putOn.length > 0}
-					title="Add a note"
-					aria-label="Add a note"
-					onclick={() => noteDialogs.putOn?.showModal()}
-				>
-					&#9998;
-				</button>
-			</div>
-			<dialog bind:this={noteDialogs.putOn} closedby="any">
-				<p class="dialog-kicker">Note — put on</p>
-				<textarea name="note" rows="3" placeholder="optional" bind:value={notes.putOn}></textarea>
-				<div class="dialog-actions">
-					<button type="button" onclick={() => { notes.putOn = ''; noteDialogs.putOn?.close(); }}>
-						Clear
-					</button>
-					<button type="button" class="primary" onclick={() => noteDialogs.putOn?.close()}>
-						Done
-					</button>
-				</div>
-			</dialog>
-		</form>
-	{/if}
+<div class="page">
+	<div class="rail">
+		<section class="banner card" class:stale={data.stale}>
+			{#if data.state.wearing}
+				<p class="kicker"><span class="dot on"></span>On wrist</p>
+				<h1 class="watch-name">{data.state.wearing.label}</h1>
+				<p class="sub num">
+					since {fmtTime(data.state.wearing.since)} · {elapsed(data.state.wearing.since)}
+				</p>
+				{#if data.state.valid_actions.includes('take_off')}
+					<form
+						method="POST"
+						action="?/takeOff"
+						use:enhance={submitAndClear}
+						class="action-row banner-action"
+					>
+						<button type="submit" class="primary off">Take Off</button>
+						<button
+							type="button"
+							class="note-btn"
+							class:pending={notes.takeOff.length > 0}
+							title="Add a note"
+							aria-label="Add a note"
+							onclick={() => noteDialogs.takeOff?.showModal()}
+						>
+							&#9998;
+						</button>
+						<dialog bind:this={noteDialogs.takeOff} closedby="any">
+							<p class="dialog-kicker">Note — take off</p>
+							<textarea name="note" rows="3" placeholder="optional" bind:value={notes.takeOff}></textarea>
+							<div class="dialog-actions">
+								<button type="button" onclick={() => { notes.takeOff = ''; noteDialogs.takeOff?.close(); }}>
+									Clear
+								</button>
+								<button type="button" class="primary" onclick={() => noteDialogs.takeOff?.close()}>
+									Done
+								</button>
+							</div>
+						</dialog>
+					</form>
+				{/if}
+			{:else}
+				<p class="kicker"><span class="dot"></span>No watch on</p>
+				<h1 class="watch-name quip">{data.quip}</h1>
+			{/if}
+			{#if data.stale}
+				<p class="nudge">⚠️ Still wearing this? Fix it in the timeline.</p>
+			{/if}
+		</section>
 
-	{#if data.state.valid_actions.includes('swap')}
-		<form method="POST" action="?/swap" use:enhance={submitAndClear} class="action-form">
-			<p class="kicker form-kicker">Swap to</p>
-			<div class="action-row">
-				<select name="watch_id" required aria-label="Watch to swap to">
-					<option value="" disabled selected>Pick a watch…</option>
-					{#each data.state.watches as w (w.id)}
-						<option value={w.id}>{w.label}</option>
-					{/each}
-				</select>
-				<button type="submit" class="primary">Swap</button>
-				<button
-					type="button"
-					class="note-btn"
-					class:pending={notes.swap.length > 0}
-					title="Add a note"
-					aria-label="Add a note"
-					onclick={() => noteDialogs.swap?.showModal()}
-				>
-					&#9998;
-				</button>
-			</div>
-			<dialog bind:this={noteDialogs.swap} closedby="any">
-				<p class="dialog-kicker">Note — swap</p>
-				<textarea name="note" rows="3" placeholder="optional" bind:value={notes.swap}></textarea>
-				<div class="dialog-actions">
-					<button type="button" onclick={() => { notes.swap = ''; noteDialogs.swap?.close(); }}>
-						Clear
-					</button>
-					<button type="button" class="primary" onclick={() => noteDialogs.swap?.close()}>
-						Done
-					</button>
-				</div>
-			</dialog>
-		</form>
-	{/if}
-</section>
-{/if}
+		{#if data.state.watches.length === 0 && !data.state.wearing}
+			<!-- The PWA opens straight onto this page, so a brand-new account needs a
+			     first step here — not a required select with zero options. -->
+			<section class="logger card empty">
+				<p class="empty-lead">Add your first watch to start logging wear.</p>
+				<a class="button primary" href="/watches/new">Add a watch</a>
+			</section>
+		{:else}
+		<section class="logger card">
+			{#if data.state.valid_actions.includes('put_on')}
+				<form method="POST" action="?/putOn" use:enhance={submitAndClear} class="action-form">
+					<p class="kicker form-kicker">Put on</p>
+					<div class="action-row">
+						<select name="watch_id" required aria-label="Watch to put on">
+							<option value="" disabled selected>Pick a watch…</option>
+							{#each data.state.watches as w (w.id)}
+								<option value={w.id}>{w.label}</option>
+							{/each}
+						</select>
+						<button type="submit" class="primary">Put On</button>
+						<button
+							type="button"
+							class="note-btn"
+							class:pending={notes.putOn.length > 0}
+							title="Add a note"
+							aria-label="Add a note"
+							onclick={() => noteDialogs.putOn?.showModal()}
+						>
+							&#9998;
+						</button>
+					</div>
+					<dialog bind:this={noteDialogs.putOn} closedby="any">
+						<p class="dialog-kicker">Note — put on</p>
+						<textarea name="note" rows="3" placeholder="optional" bind:value={notes.putOn}></textarea>
+						<div class="dialog-actions">
+							<button type="button" onclick={() => { notes.putOn = ''; noteDialogs.putOn?.close(); }}>
+								Clear
+							</button>
+							<button type="button" class="primary" onclick={() => noteDialogs.putOn?.close()}>
+								Done
+							</button>
+						</div>
+					</dialog>
+				</form>
+			{/if}
 
-{#if data.allWatches.length > 0}
-<details class="card backfill">
-	<summary>Backfill a session…</summary>
-	<form method="POST" action="?/backfill" use:enhance={withPending()}>
-		<label class="field">
-			<span class="lbl">Watch</span>
-			<select name="watch_id" required>
-				{#each data.allWatches as w (w.id)}
-					<option value={w.id}>{w.label}</option>
+			{#if data.state.valid_actions.includes('swap')}
+				<form method="POST" action="?/swap" use:enhance={submitAndClear} class="action-form">
+					<p class="kicker form-kicker">Swap to</p>
+					<div class="action-row">
+						<select name="watch_id" required aria-label="Watch to swap to">
+							<option value="" disabled selected>Pick a watch…</option>
+							{#each data.state.watches as w (w.id)}
+								<option value={w.id}>{w.label}</option>
+							{/each}
+						</select>
+						<button type="submit" class="primary">Swap</button>
+						<button
+							type="button"
+							class="note-btn"
+							class:pending={notes.swap.length > 0}
+							title="Add a note"
+							aria-label="Add a note"
+							onclick={() => noteDialogs.swap?.showModal()}
+						>
+							&#9998;
+						</button>
+					</div>
+					<dialog bind:this={noteDialogs.swap} closedby="any">
+						<p class="dialog-kicker">Note — swap</p>
+						<textarea name="note" rows="3" placeholder="optional" bind:value={notes.swap}></textarea>
+						<div class="dialog-actions">
+							<button type="button" onclick={() => { notes.swap = ''; noteDialogs.swap?.close(); }}>
+								Clear
+							</button>
+							<button type="button" class="primary" onclick={() => noteDialogs.swap?.close()}>
+								Done
+							</button>
+						</div>
+					</dialog>
+				</form>
+			{/if}
+		</section>
+		{/if}
+
+		{#if data.allWatches.length > 0}
+		<details class="card backfill">
+			<summary>Backfill a session…</summary>
+			<form method="POST" action="?/backfill" use:enhance={withPending()}>
+				<label class="field">
+					<span class="lbl">Watch</span>
+					<select name="watch_id" required>
+						{#each data.allWatches as w (w.id)}
+							<option value={w.id}>{w.label}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="field">
+					<span class="lbl">Start</span>
+					<input type="datetime-local" name="started_at" required />
+				</label>
+				<label class="field">
+					<span class="lbl">End <span class="muted">(optional — leave blank if still wearing)</span></span>
+					<input type="datetime-local" name="ended_at" />
+				</label>
+				<label class="field">
+					<span class="lbl">Note</span>
+					<textarea name="note" rows="2" placeholder="optional"></textarea>
+				</label>
+				<button type="submit" class="primary big">Add Session</button>
+			</form>
+		</details>
+		{/if}
+	</div>
+
+	<div class="history">
+		<h2>Timeline</h2>
+		{#if data.sessions.length === 0}
+			<p class="muted timeline-empty">No sessions yet — they'll show up here as you log wear.</p>
+		{:else}
+			<ul class="timeline">
+				{#each data.sessions as s (s.id)}
+					<SessionRow {s} watches={data.allWatches} homeTz={data.homeTz} />
 				{/each}
-			</select>
-		</label>
-		<label class="field">
-			<span class="lbl">Start</span>
-			<input type="datetime-local" name="started_at" required />
-		</label>
-		<label class="field">
-			<span class="lbl">End <span class="muted">(optional — leave blank if still wearing)</span></span>
-			<input type="datetime-local" name="ended_at" />
-		</label>
-		<label class="field">
-			<span class="lbl">Note</span>
-			<textarea name="note" rows="2" placeholder="optional"></textarea>
-		</label>
-		<button type="submit" class="primary big">Add Session</button>
-	</form>
-</details>
-{/if}
-
-<h2>Timeline</h2>
-{#if data.sessions.length === 0}
-	<p class="muted timeline-empty">No sessions yet — they'll show up here as you log wear.</p>
-{:else}
-	<ul class="timeline">
-		{#each data.sessions as s (s.id)}
-			<SessionRow {s} watches={data.allWatches} homeTz={data.homeTz} />
-		{/each}
-	</ul>
-{/if}
+			</ul>
+		{/if}
+	</div>
+</div>
 
 <style>
 	.banner {
@@ -409,5 +415,21 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.6rem;
+	}
+
+	@media (min-width: 60rem) {
+		.page {
+			display: grid;
+			grid-template-columns: minmax(20rem, 24rem) 1fr;
+			gap: 0 2rem;
+			align-items: start;
+		}
+		.rail {
+			position: sticky;
+			top: 1rem;
+		}
+		.history h2 {
+			margin-top: 0;
+		}
 	}
 </style>
