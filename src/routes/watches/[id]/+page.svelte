@@ -14,9 +14,9 @@
 	};
 	const submitPhoto = withPending(
 		() =>
-			async ({ update }: { update: () => Promise<void> }) => {
+			async ({ result, update }: { result: { type: string }; update: () => Promise<void> }) => {
 				await update();
-				clearPicker();
+				if (result.type === 'success') clearPicker();
 			}
 	);
 
