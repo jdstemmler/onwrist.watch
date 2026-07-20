@@ -23,4 +23,39 @@ describe('assertConfig', () => {
 		vi.stubEnv('ORIGIN', '');
 		expect(() => assertConfig()).not.toThrow();
 	});
+
+	it('throws on a non-numeric or non-positive SESSION_DAYS in any env', () => {
+		vi.stubEnv('NODE_ENV', 'test');
+		vi.stubEnv('SESSION_DAYS', 'thirty');
+		expect(() => assertConfig()).toThrow('SESSION_DAYS');
+		vi.stubEnv('SESSION_DAYS', '0');
+		expect(() => assertConfig()).toThrow('SESSION_DAYS');
+		vi.stubEnv('SESSION_DAYS', '30');
+		expect(() => assertConfig()).not.toThrow();
+	});
+
+	it('warns (not throws) in production when mail or Turnstile is unconfigured', () => {
+		vi.stubEnv('NODE_ENV', 'production');
+		vi.stubEnv('ORIGIN', 'https://onwrist.watch');
+		vi.stubEnv('RESEND_API_KEY', '');
+		vi.stubEnv('TURNSTILE_SITE_KEY', '');
+		vi.stubEnv('TURNSTILE_SECRET_KEY', '');
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		expect(() => assertConfig()).not.toThrow();
+		const output = warn.mock.calls.map((c) => String(c[0])).join('\n');
+		expect(output).toContain('RESEND_API_KEY');
+		expect(output).toContain('Turnstile');
+		warn.mockRestore();
+	});
+
+	it('warns in production when RESEND_API_KEY is set but MAIL_FROM is empty', () => {
+		vi.stubEnv('NODE_ENV', 'production');
+		vi.stubEnv('ORIGIN', 'https://onwrist.watch');
+		vi.stubEnv('RESEND_API_KEY', 're_test_key');
+		vi.stubEnv('MAIL_FROM', '');
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		expect(() => assertConfig()).not.toThrow();
+		expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('MAIL_FROM');
+		warn.mockRestore();
+	});
 });
