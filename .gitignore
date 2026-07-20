@@ -29,3 +29,6 @@ data/
 # .superpowers (task execution context)
 .superpowers/
 .claude/
+
+# Operator-local agent context (never tracked in the public repo)
+CLAUDE.local.md

@@ -5,11 +5,6 @@ logging (installable PWA) + stats dashboard, with self-serve accounts. Runs
 as a SvelteKit app + Postgres via docker compose, typically behind a
 Cloudflare tunnel.
 
-Operator-local context (production guard, deploy specifics) lives in
-@CLAUDE.local.md — tracked in the private working repo only; if that import
-is missing you're in the public source release and there is no live
-deployment to be careful of.
-
 ## Commands
 
 - `docker compose -f docker-compose.scratch.yml -p onwrist-scratch up -d` then

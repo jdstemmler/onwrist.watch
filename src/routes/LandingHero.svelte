@@ -1,6 +1,6 @@
 <script lang="ts">
 	let { appName }: { appName: string } = $props();
-	const REPO = 'https://github.com/jdstemmler/onwrist';
+	const REPO = 'https://github.com/jdstemmler/onwrist.watch';
 </script>
 
 <section class="hero">
