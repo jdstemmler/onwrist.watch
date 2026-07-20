@@ -1,4 +1,8 @@
-# horolog
+# onwrist
+
+(Repo renamed from "horolog" 2026-07-19; the checkout directory and the
+docker compose project name deliberately remain `horolog` — see the `name:`
+pin in `docker-compose.yml`.)
 
 Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session logging (installable PWA) + stats dashboard, with self-serve accounts. Runs as a SvelteKit app + Postgres via docker compose on a homelab behind cloudflared.
 
@@ -14,7 +18,7 @@ Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session log
 - `npm run check` — svelte-check / typecheck
 - `npm run db:generate` — generate Drizzle migration after schema changes (unchanged in purpose: run after editing `src/lib/server/db/schema.ts`)
 - `npm run seed` — seed the scratch Postgres (one verified user + 12 watches + wear history; refuses non-empty DB). Account emails (verify/reset/change) are logged to the console, not sent, whenever `RESEND_API_KEY` is unset — the default for the scratch stack.
-- `docker compose up -d --build horolog` — **deploy**: rebuild and recreate the live production app container on :3000 (run only as a deliberate deploy from `main` — see guard below)
+- `docker compose up -d --build onwrist` — **deploy**: rebuild and recreate the live production app container on :3000 (run only as a deliberate deploy from `main` — see guard below)
 
 ## Branching & deploy workflow
 
@@ -31,7 +35,7 @@ Multi-tenant, self-hosted watch-collection tracker: inventory + wear-session log
   (usually a squashed release PR); reconcile manually and keep using
   merge commits for `develop` → `main` releases.
 - Deploys always ship from `main`: on the homelab box, pull and
-  `docker compose up -d --build horolog` (see "Routine deploys" in
+  `docker compose up -d --build onwrist` (see "Routine deploys" in
   `docs/deploy.md`).
 
 ## Production guard

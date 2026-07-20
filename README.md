@@ -1,4 +1,4 @@
-# horolog
+# onwrist
 
 A self-hosted, multi-tenant watch-collection tracker: self-serve accounts,
 inventory management, low-friction wear-session logging via an installable
@@ -11,9 +11,9 @@ docker compose on a homelab, reachable from anywhere via cloudflared.
 
 ## Quickstart
 
-> **Note:** production still runs the pre-Plan-A image; this compose stack is
-> for the future cutover, not day-to-day dev — see "Status this branch" in
-> `docs/deploy.md` and the Development section below for the scratch stack.
+> **Note:** this compose stack *is* production (live since the July 2026
+> cutover — see `docs/deploy.md`). For day-to-day dev use the scratch stack
+> in the Development section below, never this one.
 
 ```sh
 cp .env.example .env

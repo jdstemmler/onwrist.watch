@@ -2,7 +2,7 @@
 //
 // This is the dataviz skill's documented default 8-hue categorical palette
 // (references/palette.md), validated with scripts/validate_palette.js against
-// horolog's original card surfaces and re-checked numerically (WCAG contrast)
+// onwrist's original card surfaces and re-checked numerically (WCAG contrast)
 // against the current steel surfaces (light #f7f8f4, dark #1b1f1c):
 //   light: PASS with contrast WARN on slots 3/4/5 (2.0-2.6:1) — mitigated by
 //   always pairing a colored mark with a text label/legend, never color alone

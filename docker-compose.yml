@@ -1,3 +1,9 @@
+# Pin the compose project name. It must stay "horolog" (historically derived
+# from the checkout directory) — changing it would detach the stack from the
+# live production resources, most critically the horolog_pgdata volume, and
+# `up` would create fresh empty ones.
+name: horolog
+
 services:
   db:
     image: postgres:17-alpine
@@ -13,14 +19,14 @@ services:
       timeout: 5s
       retries: 12
     restart: unless-stopped
-  horolog:
+  onwrist:
     build: .
     ports:
       - "3000:3000"
     environment:
       DATABASE_URL: postgres://onwrist:${POSTGRES_PASSWORD}@db:5432/onwrist
       SESSION_DAYS: ${SESSION_DAYS:-30}
-      APP_NAME: ${APP_NAME:-horolog}
+      APP_NAME: ${APP_NAME:-onwrist}
       # adapter-node caps request bodies at 512K by default — far below a
       # phone photo. Governs the photo-upload forms.
       BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-25M}

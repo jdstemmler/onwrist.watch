@@ -8,7 +8,7 @@ describe('createFsStorage', () => {
 	let root: string;
 
 	beforeEach(() => {
-		root = fs.mkdtempSync(path.join(os.tmpdir(), 'horolog-storage-'));
+		root = fs.mkdtempSync(path.join(os.tmpdir(), 'onwrist-storage-'));
 	});
 
 	it('roundtrips put/get/delete', async () => {

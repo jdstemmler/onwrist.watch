@@ -45,7 +45,7 @@ the production compose project and its persistent volumes.
 - **`db`** — `postgres:17-alpine`, credentials from `POSTGRES_PASSWORD` (env,
   required), database/user both `onwrist`. Data lives in the named volume
   `pgdata` (survives `down`, not `down -v`). Healthchecked via `pg_isready`.
-- **`horolog`** (the app) — built from the repo `Dockerfile`, port 3000.
+- **`onwrist`** (the app) — built from the repo `Dockerfile`, port 3000.
   Connects to the db service via `DATABASE_URL:
   postgres://onwrist:${POSTGRES_PASSWORD}@db:5432/onwrist`. Waits for the db
   healthcheck before starting. Accounts now exist (self-serve signup/verify/
@@ -71,7 +71,7 @@ the production compose project and its persistent volumes.
   gone). There's likewise no `DASH_PASSWORD` — login is per-account
   email+password.
 
-  `docker-compose.yml`'s `horolog` service `environment:` block forwards all
+  `docker-compose.yml`'s `onwrist` service `environment:` block forwards all
   of the above except `DATA_DIR` (left at its default): `MAIL_FROM`,
   `RESEND_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and
   `ADMIN_EMAIL` are passed through with empty (`:-`) defaults, not
@@ -120,12 +120,12 @@ PR is the release). On the homelab box:
 
 ```sh
 git pull --ff-only
-docker compose up -d --build horolog
+docker compose up -d --build onwrist
 ```
 
-This rebuilds the app image and recreates only the `horolog` service — the
+This rebuilds the app image and recreates only the `onwrist` service — the
 `db` container stays up, and Drizzle migrations run automatically at app
-boot. Verify with `docker compose logs --tail 20 horolog` (expect
+boot. Verify with `docker compose logs --tail 20 onwrist` (expect
 `Listening on http://0.0.0.0:3000`) and a smoke-test of `/log`.
 
 ## Legacy cutover (one-time — COMPLETED)
@@ -230,7 +230,7 @@ and running it again.
    `OWNER_EMAIL`) — production's `.env` has `RESEND_API_KEY` set, so this is
    a **real email send** to the owner's inbox, not a logged link (if
    `RESEND_API_KEY` is unset, the reset link is in
-   `docker compose logs horolog` instead of an email); the reset link
+   `docker compose logs onwrist` instead of an email); the reset link
    expires in **30 minutes**, so only request it once you're at the
    keyboard ready to use it. Spot-check the migrated collection, stats, and
    the photo render on the real URL. Do the same for the admin
@@ -311,7 +311,7 @@ safe to run live since photos are immutable once uploaded).
 
 ## Restore procedure
 
-1. Stop the app service (leave `db` up): `docker compose stop horolog`.
+1. Stop the app service (leave `db` up): `docker compose stop onwrist`.
 2. Restore the database from the newest good dump:
    ```sh
    gunzip -c /path/to/backups/onwrist-20260716.sql.gz | docker compose exec -T db psql -U onwrist onwrist
@@ -320,7 +320,7 @@ safe to run live since photos are immutable once uploaded).
    (`docker compose exec -T db dropdb -U onwrist onwrist && docker compose exec -T db createdb -U onwrist onwrist`)
    so the restore starts clean.
 3. Restore photos: `rsync -av /path/to/backups/photos/ /path/to/onwrist/data/photos/`.
-4. Start the app back up: `docker compose start horolog`. Migrations run
+4. Start the app back up: `docker compose start onwrist`. Migrations run
    automatically on boot and are a no-op if the restored schema is already
    current.
 5. Smoke-test: load `/log`, confirm the collection and current on-wrist

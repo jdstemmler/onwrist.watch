@@ -37,7 +37,7 @@ describe('photos', () => {
 		db = await createTestDb();
 		alice = (await db.insert(users).values({ email: 'alice@b.com', passwordHash: 'x' }).returning())[0].id;
 		mallory = (await db.insert(users).values({ email: 'mallory@b.com', passwordHash: 'x' }).returning())[0].id;
-		root = fs.mkdtempSync(path.join(os.tmpdir(), 'horolog-photos-'));
+		root = fs.mkdtempSync(path.join(os.tmpdir(), 'onwrist-photos-'));
 		storage = createFsStorage(root);
 	});
 
