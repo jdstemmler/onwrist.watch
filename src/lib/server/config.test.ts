@@ -24,6 +24,17 @@ describe('assertConfig', () => {
 		expect(() => assertConfig()).not.toThrow();
 	});
 
+	it('rejects a partially configured S3 block in any env', () => {
+		vi.stubEnv('NODE_ENV', 'test');
+		vi.stubEnv('S3_BUCKET', 'onwrist-photos');
+		expect(() => assertConfig()).toThrow('S3 storage is partially configured');
+		vi.stubEnv('S3_ENDPOINT', 'https://s3.us-west-004.backblazeb2.com');
+		vi.stubEnv('S3_REGION', 'us-west-004');
+		vi.stubEnv('S3_ACCESS_KEY_ID', 'key-id');
+		vi.stubEnv('S3_SECRET_ACCESS_KEY', 'key-secret');
+		expect(() => assertConfig()).not.toThrow();
+	});
+
 	it('throws on a non-numeric or non-positive SESSION_DAYS in any env', () => {
 		vi.stubEnv('NODE_ENV', 'test');
 		vi.stubEnv('SESSION_DAYS', 'thirty');

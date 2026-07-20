@@ -50,6 +50,7 @@
 			/>
 		</svg>
 	</a>
+	<a class="privacy-link" href="/privacy">Privacy</a>
 	<span class="credit"
 		>Demo watch photos via <a href="{REPO}/blob/main/scripts/demo-assets/CREDITS.md">Wikimedia Commons</a></span
 	>
@@ -216,6 +217,13 @@
 		color: var(--fg-muted);
 	}
 	.gh:hover {
+		color: var(--fg);
+	}
+	.privacy-link {
+		font-size: 0.78rem;
+		color: var(--fg-muted);
+	}
+	.privacy-link:hover {
 		color: var(--fg);
 	}
 	.credit {

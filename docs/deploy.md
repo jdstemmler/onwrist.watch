@@ -100,10 +100,13 @@ the production compose project and its persistent volumes.
 
 Photos are stored on disk by the `PhotoStorage` fs driver
 (`src/lib/server/storage/fs.ts`) under `${DATA_DIR ?? './data'}/photos`,
-mounted into the container via the `./data:/data` bind volume. There is no
-object-storage driver yet — an S3/R2-compatible `PhotoStorage` implementation
-is a documented follow-on for when the app leaves the homelab (see
-"Homelab → hosted" below).
+mounted into the container via the `./data:/data` bind volume — the
+default. Setting the five `S3_*` env vars (see `.env.example`) switches
+`getStorage()` to the S3-compatible driver (`src/lib/server/storage/s3.ts`;
+Backblaze B2, Cloudflare R2, MinIO, AWS) and photos live in a **private**
+bucket instead — the app remains the only reader, since per-user access is
+enforced by the photo route, not the bucket. Partial S3 config fails at
+boot rather than at the first upload.
 
 **Photo storage ownership:** the app container runs as the unprivileged
 `node` user (uid 1000), so the bind-mounted `./data` directory on the host
@@ -364,18 +367,15 @@ that happens):
    Backup, above) and restore it into the hosted Postgres instance with
    `psql` pointed at the hosted connection string. Confirm row counts match
    before cutting over.
-2. **Photos → object storage:** the fs `PhotoStorage` driver
-   (`src/lib/server/storage/fs.ts`) stores each photo as a file under a key;
-   moving to R2/S3 means implementing the same `PhotoStorage` interface
-   (`put`/`get`/`delete`/`sizeOfPrefix`) against an S3-compatible client and
-   swapping it in via `getStorage()` (`src/lib/server/storage/index.ts`).
-   That driver is not built yet — it's a documented follow-on, not part of
-   this plan. Until it exists, bulk-upload the existing `data/photos/` tree
-   to the bucket with matching keys before flipping the driver, so existing
-   watch records' stored keys keep resolving.
+2. **Photos → object storage:** the S3-compatible `PhotoStorage` driver
+   (`src/lib/server/storage/s3.ts`) is selected by setting the five `S3_*`
+   env vars. Storage keys are identical across drivers, so bulk-upload the
+   existing `data/photos/` tree to the bucket with matching keys (e.g.
+   `rclone copy data/photos/ remote:bucket/`) before flipping the vars, and
+   existing watch records' stored keys keep resolving.
 3. **Env swap:** point `DATABASE_URL` at the hosted Postgres connection
-   string and (once built) the object-storage driver's credentials at the
-   bucket. `ORIGIN` does **not** change for this move — it tracks the public
+   string and the `S3_*` vars at the bucket. `ORIGIN` does **not** change
+   for this move — it tracks the public
    URL the dashboard loads from, which stays the same tunnel hostname
    whether the app and db sit on the homelab box or a hosted VM.
 4. Cut the tunnel over to the new app instance, verify, then decommission
