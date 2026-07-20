@@ -50,6 +50,6 @@ export const actions: Actions = {
 		const token = cookies.get(SESSION_COOKIE);
 		if (token) await revokeSession(await getDb(), token);
 		cookies.delete(SESSION_COOKIE, { path: '/' });
-		redirect(303, '/login');
+		redirect(303, '/');
 	}
 };

@@ -103,7 +103,8 @@
 			height={TOP_PAD + 7 * STEP}
 			viewBox="0 0 {LEFT_PAD + colCount * STEP} {TOP_PAD + 7 * STEP}"
 			role="img"
-			aria-label="Calendar heatmap of {year}, colored by the watch worn most that day"
+			aria-label="Calendar heatmap, {days[0]?.dayKey ?? year} through {days.at(-1)?.dayKey ??
+				year}, colored by the watch worn most that day"
 		>
 			{#each monthLabels as m}
 				<text x={LEFT_PAD + m.col * STEP} y={TOP_PAD - 5} class="month">{m.label}</text>

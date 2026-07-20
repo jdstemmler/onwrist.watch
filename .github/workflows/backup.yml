@@ -1,13 +1,16 @@
 # Nightly off-platform backup of the production Postgres to Backblaze B2.
 #
-# Only runs in the flagship repo (guarded below); forks/self-hosters should
-# use the cron approach documented in docs/deploy.md instead.
+# Opt-in per instance: the job only runs when the B2_BUCKET Actions
+# variable is set. Forks/self-hosters can either set the variable + the
+# secrets below, or use the cron approach documented in docs/deploy.md.
 #
+# Required Actions variable:
+#   B2_BUCKET            — target Backblaze bucket name
 # Required Actions secrets:
 #   BACKUP_DATABASE_URL  — Postgres URL reachable from GitHub runners
-#                          (Railway's DATABASE_PUBLIC_URL)
-#   B2_KEY_ID            — Backblaze application key ID, scoped to the
-#   B2_APP_KEY           — onwrist-backups bucket only
+#                          (e.g. Railway's DATABASE_PUBLIC_URL)
+#   B2_KEY_ID            — Backblaze application key ID, scoped to that
+#   B2_APP_KEY           — bucket only
 name: backup
 
 on:
@@ -21,7 +24,7 @@ concurrency: backup
 
 jobs:
   dump:
-    if: github.repository == 'jdstemmler/onwrist.watch'
+    if: vars.B2_BUCKET != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -49,10 +52,11 @@ jobs:
           RCLONE_CONFIG_B2_TYPE: b2
           RCLONE_CONFIG_B2_ACCOUNT: ${{ secrets.B2_KEY_ID }}
           RCLONE_CONFIG_B2_KEY: ${{ secrets.B2_APP_KEY }}
+          B2_BUCKET: ${{ vars.B2_BUCKET }}
         run: |
           set -euo pipefail
           sudo apt-get install -y --no-install-recommends rclone
-          rclone copyto "$file" "b2:onwrist-backups/nightly/$file"
-          rclone delete --min-age 30d b2:onwrist-backups/nightly
+          rclone copyto "$file" "b2:${B2_BUCKET}/nightly/$file"
+          rclone delete --min-age 30d "b2:${B2_BUCKET}/nightly"
           echo "current backups:"
-          rclone ls b2:onwrist-backups/nightly
+          rclone ls "b2:${B2_BUCKET}/nightly"

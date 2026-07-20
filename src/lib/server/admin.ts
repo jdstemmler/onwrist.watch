@@ -4,7 +4,7 @@ import type { DB } from './db';
 import { users, watches, watchPhotos, authSessions } from './db/schema';
 import { hashPassword, emailKey } from './passwords';
 import { revokeAllSessions } from './auth';
-import { StateError } from './sessions';
+import { StateError, lockUser } from './sessions';
 import { getStorage, type PhotoStorage } from './storage';
 
 /** Boot-time seed: create the ops admin from ADMIN_EMAIL if none exists.
@@ -85,7 +85,7 @@ export async function listUsersWithMeta(db: DB, storage: PhotoStorage = getStora
 export async function setUserDisabled(db: DB, userId: number, disabled: boolean, now = new Date()): Promise<void> {
 	if (disabled) {
 		const target = (await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1))[0];
-		if (target?.role === 'admin') throw new StateError('Admin accounts can’t be disabled here', 400);
+		if (target?.role === 'admin') throw new StateError('Admin accounts cannot be disabled here', 400);
 	}
 	await db.transaction(async (tx) => {
 		await tx.update(users).set({ disabledAt: disabled ? now : null }).where(eq(users.id, userId));
@@ -94,17 +94,29 @@ export async function setUserDisabled(db: DB, userId: number, disabled: boolean,
 }
 
 export async function deleteUser(db: DB, userId: number, storage: PhotoStorage = getStorage()): Promise<void> {
-	const target = (await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1))[0];
-	if (!target) return;
-	if (target.role === 'admin') throw new StateError('Admin accounts can’t be deleted here', 400);
-	// Remove photo files before the cascade drops their rows (files aren't cascaded).
-	const photos = await db
-		.select({ filePath: watchPhotos.filePath })
-		.from(watchPhotos)
-		.innerJoin(watches, eq(watches.id, watchPhotos.watchId))
-		.where(eq(watches.userId, userId));
-	for (const p of photos) await storage.delete(p.filePath);
-	await db.delete(users).where(eq(users.id, userId)); // FKs cascade watches/sessions/photos/tokens rows
+	const photoKeys = await db.transaction(async (tx) => {
+		const target = (await tx.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1))[0];
+		if (!target) return [];
+		if (target.role === 'admin') throw new StateError('Admin accounts cannot be deleted here', 400);
+		// Collect keys and drop the rows behind the user lock — savePhoto
+		// serializes behind the same lock, so a concurrent upload can't land a
+		// photo between the SELECT and the DELETE and leave its file orphaned
+		// forever. Same shape as deleteAccount.
+		await lockUser(tx, userId);
+		const keys = (
+			await tx
+				.select({ filePath: watchPhotos.filePath })
+				.from(watchPhotos)
+				.innerJoin(watches, eq(watches.id, watchPhotos.watchId))
+				.where(eq(watches.userId, userId))
+		).map((p) => p.filePath);
+		// Rows first, files second: a crash in between leaves reclaimable orphan
+		// files (quota-inflating but harmless) instead of rows pointing at missing
+		// files — same ordering as deleteWatch and deleteAccount.
+		await tx.delete(users).where(eq(users.id, userId)); // FKs cascade watches/sessions/photos/tokens rows
+		return keys;
+	});
+	for (const key of photoKeys) await storage.delete(key);
 }
 
 export async function setQuotaMultiplier(db: DB, userId: number, n: number): Promise<void> {
