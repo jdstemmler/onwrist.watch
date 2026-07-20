@@ -161,7 +161,7 @@
 		</div>
 		<div class="stat card">
 			<span class="stat-value num">{data.stats.distinctDays}</span>
-			<span class="stat-label muted">Distinct days</span>
+			<span class="stat-label muted">Days worn</span>
 		</div>
 		<div class="stat card">
 			<span class="stat-value num">{data.stats.hours.toFixed(1)}</span>

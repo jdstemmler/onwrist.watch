@@ -50,11 +50,14 @@ export async function statsByWatch(db: DB, userId: number, tz: string, now: Date
 		const mine = clamped.filter((s) => s.watchId === w.id);
 		const days = new Set<string>();
 		let minutes = 0;
-		for (const s of mine)
-			for (const slice of sliceSession(s.startedAt, s.endedAt, tz)) {
-				days.add(slice.dayKey);
-				minutes += slice.minutes;
-			}
+		for (const s of mine) {
+			// "Days worn" buckets by the homeTz day the wear started: an
+			// evening that runs past midnight is one day worn. The calendar
+			// heatmap and DOW/TOD charts still slice across midnight — that
+			// is time accounting, not wear counting.
+			days.add(zonedParts(s.startedAt, tz).dayKey);
+			for (const slice of sliceSession(s.startedAt, s.endedAt, tz)) minutes += slice.minutes;
+		}
 		// "Last worn" is when the watch last came off the wrist (clamped `now`
 		// for a still-open session), not when it last went on — a week-long
 		// session shouldn't read as "worn 7 days ago" the day it ends.
