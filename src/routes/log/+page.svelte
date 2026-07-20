@@ -27,23 +27,16 @@
 			timeZone: data.homeTz
 		}).format(new Date(d));
 
+	// One picker serves both put-on and swap: each watch in the list is a
+	// submit button, so choosing a watch IS the action — no select + confirm.
+	// Notes are added afterwards from the timeline's edit form.
+	let picker = $state<HTMLDialogElement>();
 
-	// Notes live behind a pencil icon + <dialog> so the logger stays compact;
-	// the textarea sits inside its action's <form>, so the value submits
-	// normally. Pencil shows an active state while a note is pending.
-	let notes = $state({ putOn: '', swap: '', takeOff: '' });
-	let noteDialogs: Partial<Record<keyof typeof notes, HTMLDialogElement>> = {};
-
-	const clearNotes = () => {
-		notes.putOn = notes.swap = notes.takeOff = '';
-	};
-	// after a successful action, reset pending notes along with the form;
-	// withPending disables the submitter while the request is in flight
-	const submitAndClear = withPending(
+	const pickWatch = withPending(
 		() =>
 			async ({ update }: { update: () => Promise<void> }) => {
+				picker?.close();
 				await update();
-				clearNotes();
 			}
 	);
 </script>
@@ -58,138 +51,61 @@
 
 <div class="page">
 	<div class="rail">
-		<section class="banner card" class:stale={data.stale}>
+		<section class="wear card" class:stale={data.stale}>
 			{#if data.state.wearing}
 				<p class="kicker"><span class="dot on"></span>On wrist</p>
 				<h1 class="watch-name">{data.state.wearing.label}</h1>
 				<p class="sub num">
 					since {fmtTime(data.state.wearing.since)} · {elapsed(data.state.wearing.since)}
 				</p>
-				{#if data.state.valid_actions.includes('take_off')}
-					<form
-						method="POST"
-						action="?/takeOff"
-						use:enhance={submitAndClear}
-						class="action-row banner-action"
-					>
-						<button type="submit" class="primary off">Take Off</button>
-						<button
-							type="button"
-							class="note-btn"
-							class:pending={notes.takeOff.length > 0}
-							title="Add a note"
-							aria-label="Add a note"
-							onclick={() => noteDialogs.takeOff?.showModal()}
-						>
-							&#9998;
-						</button>
-						<dialog bind:this={noteDialogs.takeOff} closedby="any">
-							<p class="dialog-kicker">Note — take off</p>
-							<textarea name="note" rows="3" placeholder="optional" bind:value={notes.takeOff}></textarea>
-							<div class="dialog-actions">
-								<button type="button" onclick={() => { notes.takeOff = ''; noteDialogs.takeOff?.close(); }}>
-									Clear
-								</button>
-								<button type="button" class="primary" onclick={() => noteDialogs.takeOff?.close()}>
-									Done
-								</button>
-							</div>
-						</dialog>
-					</form>
-				{/if}
+				<div class="actions">
+					{#if data.state.valid_actions.includes('take_off')}
+						<form method="POST" action="?/takeOff" use:enhance={withPending()}>
+							<button type="submit" class="primary off">Take Off</button>
+						</form>
+					{/if}
+					{#if data.state.valid_actions.includes('swap') && data.state.watches.length > 0}
+						<button type="button" onclick={() => picker?.showModal()}>Swap…</button>
+					{/if}
+				</div>
 			{:else}
 				<p class="kicker"><span class="dot"></span>No watch on</p>
 				<h1 class="watch-name quip">{data.quip}</h1>
+				{#if data.state.watches.length === 0}
+					<!-- The PWA opens straight onto this page, so a brand-new account
+					     needs a first step here — not a picker with zero options. -->
+					<p class="empty-lead">Add your first watch to start logging wear.</p>
+					<div class="actions">
+						<a class="button primary" href="/watches/new">Add a watch</a>
+					</div>
+				{:else if data.state.valid_actions.includes('put_on')}
+					<div class="actions">
+						<button type="button" class="primary" onclick={() => picker?.showModal()}>
+							Put on a watch…
+						</button>
+					</div>
+				{/if}
 			{/if}
 			{#if data.stale}
 				<p class="nudge">⚠️ Still wearing this? Fix it in the timeline.</p>
 			{/if}
-		</section>
 
-		{#if data.state.watches.length === 0 && !data.state.wearing}
-			<!-- The PWA opens straight onto this page, so a brand-new account needs a
-			     first step here — not a required select with zero options. -->
-			<section class="logger card empty">
-				<p class="empty-lead">Add your first watch to start logging wear.</p>
-				<a class="button primary" href="/watches/new">Add a watch</a>
-			</section>
-		{:else}
-		<section class="logger card">
-			{#if data.state.valid_actions.includes('put_on')}
-				<form method="POST" action="?/putOn" use:enhance={submitAndClear} class="action-form">
-					<p class="kicker form-kicker">Put on</p>
-					<div class="action-row">
-						<select name="watch_id" required aria-label="Watch to put on">
-							<option value="" disabled selected>Pick a watch…</option>
-							{#each data.state.watches as w (w.id)}
-								<option value={w.id}>{w.label}</option>
-							{/each}
-						</select>
-						<button type="submit" class="primary">Put On</button>
-						<button
-							type="button"
-							class="note-btn"
-							class:pending={notes.putOn.length > 0}
-							title="Add a note"
-							aria-label="Add a note"
-							onclick={() => noteDialogs.putOn?.showModal()}
-						>
-							&#9998;
-						</button>
+			<dialog bind:this={picker} closedby="any" aria-label={data.state.wearing ? 'Swap to' : 'Put on'}>
+				<p class="dialog-kicker">{data.state.wearing ? 'Swap to' : 'Put on'}</p>
+				<form
+					method="POST"
+					action={data.state.wearing ? '?/swap' : '?/putOn'}
+					use:enhance={pickWatch}
+				>
+					<div class="picker-list">
+						{#each data.state.watches as w (w.id)}
+							<button type="submit" name="watch_id" value={w.id}>{w.label}</button>
+						{/each}
 					</div>
-					<dialog bind:this={noteDialogs.putOn} closedby="any">
-						<p class="dialog-kicker">Note — put on</p>
-						<textarea name="note" rows="3" placeholder="optional" bind:value={notes.putOn}></textarea>
-						<div class="dialog-actions">
-							<button type="button" onclick={() => { notes.putOn = ''; noteDialogs.putOn?.close(); }}>
-								Clear
-							</button>
-							<button type="button" class="primary" onclick={() => noteDialogs.putOn?.close()}>
-								Done
-							</button>
-						</div>
-					</dialog>
 				</form>
-			{/if}
-
-			{#if data.state.valid_actions.includes('swap')}
-				<form method="POST" action="?/swap" use:enhance={submitAndClear} class="action-form">
-					<p class="kicker form-kicker">Swap to</p>
-					<div class="action-row">
-						<select name="watch_id" required aria-label="Watch to swap to">
-							<option value="" disabled selected>Pick a watch…</option>
-							{#each data.state.watches as w (w.id)}
-								<option value={w.id}>{w.label}</option>
-							{/each}
-						</select>
-						<button type="submit" class="primary">Swap</button>
-						<button
-							type="button"
-							class="note-btn"
-							class:pending={notes.swap.length > 0}
-							title="Add a note"
-							aria-label="Add a note"
-							onclick={() => noteDialogs.swap?.showModal()}
-						>
-							&#9998;
-						</button>
-					</div>
-					<dialog bind:this={noteDialogs.swap} closedby="any">
-						<p class="dialog-kicker">Note — swap</p>
-						<textarea name="note" rows="3" placeholder="optional" bind:value={notes.swap}></textarea>
-						<div class="dialog-actions">
-							<button type="button" onclick={() => { notes.swap = ''; noteDialogs.swap?.close(); }}>
-								Clear
-							</button>
-							<button type="button" class="primary" onclick={() => noteDialogs.swap?.close()}>
-								Done
-							</button>
-						</div>
-					</dialog>
-				</form>
-			{/if}
+				<button type="button" class="picker-cancel" onclick={() => picker?.close()}>Cancel</button>
+			</dialog>
 		</section>
-		{/if}
 
 		{#if data.allWatches.length > 0}
 		<details class="card backfill">
@@ -236,12 +152,12 @@
 </div>
 
 <style>
-	.banner {
+	.wear {
 		text-align: center;
-		margin-bottom: 1rem;
-		padding-block: 1.25rem;
+		margin-bottom: 0.75rem;
+		padding: 1.4rem 1rem 1.2rem;
 	}
-	.banner.stale {
+	.wear.stale {
 		border-color: var(--danger);
 	}
 	.kicker {
@@ -284,7 +200,7 @@
 		margin: 0.3rem 0 0;
 	}
 	.nudge {
-		margin: 0.5rem 0 0;
+		margin: 0.6rem 0 0;
 		color: var(--danger);
 		font-weight: 600;
 	}
@@ -296,69 +212,28 @@
 		margin: 0 0 1rem;
 		font-weight: 600;
 	}
-	.logger {
+	.actions {
 		display: flex;
-		flex-direction: column;
+		justify-content: center;
 		gap: 0.6rem;
-		margin-bottom: 0.75rem;
-		max-width: 34rem;
-		margin-inline: auto;
-		padding: 0.75rem;
+		margin-top: 1.1rem;
 	}
-	.logger.empty {
-		align-items: center;
-		text-align: center;
-		padding: 1.5rem 1rem;
+	/* the Take Off form is a flex child; let its button fill it */
+	.actions form {
+		display: contents;
+	}
+	.actions button,
+	.actions .button {
+		flex: 1 1 0;
+		max-width: 10.5rem;
+		padding-block: 0.55rem;
 	}
 	.empty-lead {
-		margin: 0;
+		margin: 0.75rem 0 0;
 		color: var(--fg-muted);
 	}
 	.timeline-empty {
 		margin: 0 0 2rem;
-	}
-	.action-row {
-		display: flex;
-		gap: 0.5rem;
-		align-items: stretch;
-	}
-	.action-row select {
-		flex: 1 1 8rem;
-		min-width: 0;
-		color: var(--fg);
-	}
-	.action-row button.primary {
-		flex: 0 0 auto;
-	}
-	.action-row button.off {
-		flex: 1 1 auto;
-	}
-	.banner-action {
-		margin-top: 0.9rem;
-		max-width: 18rem;
-		margin-inline: auto;
-	}
-	.action-form {
-		display: flex;
-		flex-direction: column;
-	}
-	.form-kicker {
-		justify-content: flex-start;
-		margin-bottom: 0.45rem;
-	}
-	.note-btn {
-		flex: 0 0 2.5rem;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 1rem;
-		color: var(--fg-muted);
-		padding: 0;
-	}
-	.note-btn.pending {
-		color: var(--accent-fg);
-		background: var(--accent);
-		border-color: var(--accent);
 	}
 	dialog {
 		background: var(--bg-raised);
@@ -380,17 +255,23 @@
 		text-transform: uppercase;
 		color: var(--fg-muted);
 		margin: 0 0 0.6rem;
+		text-align: left;
 	}
-	dialog textarea {
-		width: 100%;
-		color: var(--fg);
-		resize: vertical;
-	}
-	.dialog-actions {
+	.picker-list {
 		display: flex;
-		justify-content: space-between;
-		gap: 0.5rem;
+		flex-direction: column;
+		gap: 0.45rem;
+		max-height: 55dvh;
+		overflow-y: auto;
+	}
+	.picker-list button {
+		width: 100%;
+		padding: 0.6rem 0.9rem;
+	}
+	.picker-cancel {
+		width: 100%;
 		margin-top: 0.75rem;
+		color: var(--fg-muted);
 	}
 	.backfill {
 		margin-bottom: 1.5rem;
