@@ -3,7 +3,13 @@
 
 	type Cell = { dayKey: string; watchId: number; label: string; hours: number };
 
-	let { calendar, year, colorSlots }: { calendar: Cell[]; year: number; colorSlots: Map<number, number> } = $props();
+	let { calendar, year, firstDayKey, todayKey, colorSlots }: {
+		calendar: Cell[];
+		year: number;
+		firstDayKey: string | null;
+		todayKey: string;
+		colorSlots: Map<number, number>;
+	} = $props();
 
 	const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -13,10 +19,17 @@
 
 	type Day = { dayKey: string; dow: number; col: number; month: number; date: number };
 
+	function keyToUtc(k: string): number {
+		const [y, m, d] = k.split('-').map(Number);
+		return Date.UTC(y, m - 1, d);
+	}
+
 	const days = $derived.by((): Day[] => {
 		const out: Day[] = [];
-		const start = Date.UTC(year, 0, 1);
-		const end = Date.UTC(year, 11, 31);
+		// Grid runs first-session → today, clamped to the displayed year —
+		// no empty months before any logged data, no future months.
+		const start = Math.max(Date.UTC(year, 0, 1), firstDayKey ? keyToUtc(firstDayKey) : -Infinity);
+		const end = Math.min(Date.UTC(year, 11, 31), keyToUtc(todayKey));
 		const firstDow = new Date(start).getUTCDay();
 		let idx = 0;
 		for (let t = start; t <= end; t += 86_400_000) {
@@ -40,7 +53,7 @@
 		const seen = new Set<number>();
 		const out: { col: number; label: string }[] = [];
 		for (const d of days) {
-			if (d.date === 1 && !seen.has(d.month)) {
+			if (!seen.has(d.month)) {
 				seen.add(d.month);
 				out.push({ col: d.col, label: MONTHS[d.month] });
 			}
@@ -67,9 +80,17 @@
 
 <div class="chart-palette calendar-heatmap">
 	<div class="year-nav">
-		<a href="?year={year - 1}">&larr; {year - 1}</a>
+		{#if firstDayKey && year > Number(firstDayKey.slice(0, 4))}
+			<a href="?year={year - 1}">&larr; {year - 1}</a>
+		{:else}
+			<span class="nav-spacer"></span>
+		{/if}
 		<span class="year num">{year}</span>
-		<a href="?year={year + 1}">{year + 1} &rarr;</a>
+		{#if year < Number(todayKey.slice(0, 4))}
+			<a href="?year={year + 1}">{year + 1} &rarr;</a>
+		{:else}
+			<span class="nav-spacer"></span>
+		{/if}
 	</div>
 
 	<div class="grid-scroll">
@@ -132,6 +153,9 @@
 	}
 	.year-nav a:hover {
 		text-decoration: underline;
+	}
+	.nav-spacer {
+		min-width: 3.5rem;
 	}
 	.year {
 		font-weight: 600;
