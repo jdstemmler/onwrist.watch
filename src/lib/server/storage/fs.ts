@@ -14,6 +14,8 @@ function resolveWithin(root: string, key: string): string | null {
  * app that touches the filesystem for photo files. */
 export function createFsStorage(root: string): PhotoStorage {
 	return {
+		kind: 'fs',
+
 		async put(key, data) {
 			const abs = resolveWithin(root, key);
 			if (!abs) throw new Error(`Storage key escapes root: ${key}`);

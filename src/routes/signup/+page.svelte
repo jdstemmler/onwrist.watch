@@ -58,6 +58,7 @@
 			</form>
 			<div class="links">
 				<a href="/login">Already have an account? Log in</a>
+				<a href="/privacy">Privacy</a>
 			</div>
 		{/if}
 	</div>
@@ -136,6 +137,8 @@
 	}
 
 	.links {
+		display: flex;
+		justify-content: space-between;
 		font-size: 0.8rem;
 	}
 

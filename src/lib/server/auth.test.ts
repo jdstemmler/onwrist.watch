@@ -142,6 +142,7 @@ describe('routeClass', () => {
 		['/reset/confirm', 'public'],
 		['/manifest.webmanifest', 'public'],
 		['/healthz', 'public'],
+		['/privacy', 'public'],
 		['/icon-192.png', 'public'],
 		['/icon-512.png', 'public'],
 		['/favicon.ico', 'public'],
