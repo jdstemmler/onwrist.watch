@@ -63,7 +63,9 @@ the production compose project and its persistent volumes.
   | `RESEND_API_KEY` | Resend API key for sending account emails. **Unset ⇒ emails are logged to stdout, not sent** — fine for a homelab box without outbound mail configured, but real users won't receive their verify/reset links until this is set. |
   | `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile bot check on signup. |
   | `POSTGRES_PASSWORD` | Postgres superuser password for the `db` service (required, no default). |
-  | `ADMIN_EMAIL` | Seeds one `admin`-role account at boot (`ensureAdmin()`, called from `getDb()`) if no admin exists yet — idempotent and safe to leave set permanently. The seeded account gets an unusable random password hash; there's no separate admin-invite step — the operator sets the real password by running the ordinary forgot-password flow (`/reset`) against `ADMIN_EMAIL`, same as any user. Unset ⇒ no admin is seeded and `/admin` is unreachable (404 for everyone). |
+  | `ADMIN_EMAIL` | Seeds one `admin`-role account at boot if none exists; unset ⇒ no admin is seeded and `/admin` stays 404 for everyone. Details under "First-boot admin" below. |
+  | `ADDRESS_HEADER` | Header trusted for the client IP; compose defaults it to `CF-Connecting-IP`. Behind cloudflared every request reaches the app from the tunnel's socket, so without this all per-IP rate limits share **one global bucket** — ten failed logins by anyone would lock out login for everyone. Cloudflare always overwrites `CF-Connecting-IP` so it can't be client-spoofed, but that trust is only sound while the port is loopback-bound (`BIND_ADDRESS` below). **Not behind Cloudflare? Set it empty** — adapter-node 500s on any request missing a configured header. |
+  | `BIND_ADDRESS` | Host interface the app port publishes on; compose defaults to `127.0.0.1` so the tunnel is the only way in. LAN-only deploy without a tunnel: set `0.0.0.0` (and clear `ADDRESS_HEADER`). |
 
   Per-user preferences — home timezone and the stale-session-open nudge
   threshold — live on the `users` row and are edited on `/settings`; they are
@@ -76,12 +78,15 @@ the production compose project and its persistent volumes.
   `RESEND_API_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and
   `ADMIN_EMAIL` are passed through with empty (`:-`) defaults, not
   `:?`-required, so the app still boots without email/captcha/admin
-  configured — an empty `RESEND_API_KEY` just falls back to logging account
+  configured — an empty `RESEND_API_KEY` falls back to logging account
   emails to stdout instead of sending them, same as the scratch stack, and
   an empty `ADMIN_EMAIL` just means no admin gets seeded (`/admin` stays 404
-  for everyone). Set the four mail/captcha vars in `.env` to actually send
-  mail and enforce the signup captcha in production; set `ADMIN_EMAIL` to
-  get an admin console.
+  for everyone). Note the captcha is different: it **fails closed**, so with
+  the Turnstile keys empty nobody can sign up at all (the widget can't
+  render and server-side verification rejects). The app warns about both
+  situations at boot in production (`assertConfig`). Set the four
+  mail/captcha vars in `.env` for a working production signup flow; set
+  `ADMIN_EMAIL` to get an admin console.
 
   **First-boot admin:** setting `ADMIN_EMAIL` in `.env` before the first
   `docker compose up` seeds one `admin`-role account at that address
@@ -99,6 +104,18 @@ mounted into the container via the `./data:/data` bind volume. There is no
 object-storage driver yet — an S3/R2-compatible `PhotoStorage` implementation
 is a documented follow-on for when the app leaves the homelab (see
 "Homelab → hosted" below).
+
+**Photo storage ownership:** the app container runs as the unprivileged
+`node` user (uid 1000), so the bind-mounted `./data` directory on the host
+must be writable by uid 1000:
+
+```sh
+sudo chown -R 1000:1000 data/
+```
+
+Run this once before the first deploy of a non-root image (photo uploads
+fail with EACCES otherwise). Pre-existing root-owned files from earlier
+root-container deploys need the same one-time chown.
 
 In front of both services: an existing cloudflared tunnel pointed at
 `localhost:3000`. Cloudflare Access in front of that is optional
@@ -125,8 +142,12 @@ docker compose up -d --build onwrist
 
 This rebuilds the app image and recreates only the `onwrist` service — the
 `db` container stays up, and Drizzle migrations run automatically at app
-boot. Verify with `docker compose logs --tail 20 onwrist` (expect
-`Listening on http://0.0.0.0:3000`) and a smoke-test of `/log`.
+boot (kicked off eagerly by `hooks.server.ts`, so a broken migration shows
+in the logs immediately rather than as 500s on first request). Verify with
+`docker compose logs --tail 20 onwrist` (expect
+`Listening on http://0.0.0.0:3000`), `docker compose ps` (the `onwrist`
+service healthcheck probes `/healthz`, which round-trips the DB), and a
+smoke-test of `/log`.
 
 ## Legacy cutover (one-time — COMPLETED)
 
@@ -309,16 +330,24 @@ Run both from the same cron entry or stagger them; neither needs the app
 stopped (pg_dump is a consistent snapshot; rsync of already-written files is
 safe to run live since photos are immutable once uploaded).
 
+Two things this section can't do for you: **verify the cron entries
+actually exist on the box** (`crontab -l`), and **keep a copy off the
+box** — a backup on the same disk as production doesn't survive the disk.
+Sync the dump directory somewhere external (rclone to object storage, a
+second machine, anything). Once real users have accounts, rehearse one
+full restore (next section) into the scratch stack and note the date here.
+
 ## Restore procedure
 
 1. Stop the app service (leave `db` up): `docker compose stop onwrist`.
-2. Restore the database from the newest good dump:
+2. Drop and recreate the database, then restore from the newest good dump.
+   The drop/recreate is not optional: piping a plain-SQL dump over existing
+   objects sprays errors and can interleave old and new rows.
    ```sh
+   docker compose exec -T db dropdb -U onwrist onwrist
+   docker compose exec -T db createdb -U onwrist onwrist
    gunzip -c /path/to/backups/onwrist-20260716.sql.gz | docker compose exec -T db psql -U onwrist onwrist
    ```
-   If restoring into a fresh volume, drop and recreate the database first
-   (`docker compose exec -T db dropdb -U onwrist onwrist && docker compose exec -T db createdb -U onwrist onwrist`)
-   so the restore starts clean.
 3. Restore photos: `rsync -av /path/to/backups/photos/ /path/to/onwrist/data/photos/`.
 4. Start the app back up: `docker compose start onwrist`. Migrations run
    automatically on boot and are a no-op if the restored schema is already

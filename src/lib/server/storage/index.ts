@@ -6,7 +6,7 @@ export type PhotoStorage = {
 	put(key: string, data: Buffer): Promise<void>;
 	get(key: string): Promise<Buffer | null>;
 	delete(key: string): Promise<void>;
-	sizeOfPrefix(prefix: string): Promise<number>; // bytes under a key prefix (quota support, Plan B)
+	sizeOfPrefix(prefix: string): Promise<number>; // bytes under a key prefix (storage quotas)
 };
 
 let instance: PhotoStorage | undefined;
