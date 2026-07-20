@@ -1,7 +1,24 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import { enhance } from '$app/forms';
+	import { withPending } from '$lib/pending';
+	import type { ActionData, PageData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	let fileInput = $state<HTMLInputElement>();
+	let selectedName = $state('');
+
+	const clearPicker = () => {
+		selectedName = '';
+		if (fileInput) fileInput.value = '';
+	};
+	const submitPhoto = withPending(
+		() =>
+			async ({ result, update }: { result: { type: string }; update: () => Promise<void> }) => {
+				await update();
+				if (result.type === 'success') clearPicker();
+			}
+	);
 
 	const DOW_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -84,8 +101,39 @@
 				<p class="subtitle muted">{data.watch.brand} {data.watch.model}</p>
 			{/if}
 		</div>
-		<a class="button" href="/watches/{data.watch.id}/edit">Edit</a>
+		<div class="head-actions">
+			<button type="button" class="button" onclick={() => fileInput?.click()}>Add photo</button>
+			<a class="button" href="/watches/{data.watch.id}/edit">Edit</a>
+		</div>
 	</header>
+
+	{#if form?.message}
+		<p class="toast" role="alert">{form.message}</p>
+	{/if}
+
+	<form method="POST" action="?/addPhoto" enctype="multipart/form-data" use:enhance={submitPhoto}>
+		<input
+			bind:this={fileInput}
+			type="file"
+			name="photo"
+			accept="image/*"
+			class="file-input"
+			onchange={() => (selectedName = fileInput?.files?.[0]?.name ?? '')}
+		/>
+		{#if selectedName}
+			<div class="confirm card">
+				<span class="filename">{selectedName}</span>
+				<label class="primary-check">
+					<input type="checkbox" name="make_primary" value="1" />
+					Set as primary
+				</label>
+				<div class="confirm-actions">
+					<button type="button" onclick={clearPicker}>Cancel</button>
+					<button type="submit" class="primary">Upload</button>
+				</div>
+			</div>
+		{/if}
+	</form>
 
 	{#if sortedPhotos.length}
 	<section class="photos">
@@ -113,7 +161,7 @@
 		</div>
 		<div class="stat card">
 			<span class="stat-value num">{data.stats.distinctDays}</span>
-			<span class="stat-label muted">Distinct days</span>
+			<span class="stat-label muted">Days worn</span>
 		</div>
 		<div class="stat card">
 			<span class="stat-value num">{data.stats.hours.toFixed(1)}</span>
@@ -480,6 +528,52 @@
 		font-style: italic;
 		color: var(--fg-muted);
 		font-size: 0.88rem;
+	}
+
+	.head-actions {
+		display: flex;
+		gap: 0.5rem;
+		align-items: flex-start;
+	}
+
+	.file-input {
+		display: none;
+	}
+
+	.toast {
+		background: var(--danger);
+		color: var(--danger-fg);
+		border-radius: var(--radius);
+		padding: 0.75rem 1rem;
+		margin: 0;
+		font-weight: 600;
+	}
+
+	.confirm {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem 1rem;
+		padding: 0.75rem 1rem;
+	}
+
+	.filename {
+		font-size: 0.9rem;
+		overflow-wrap: anywhere;
+	}
+
+	.primary-check {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.9rem;
+		color: var(--fg-muted);
+	}
+
+	.confirm-actions {
+		display: flex;
+		gap: 0.5rem;
+		margin-left: auto;
 	}
 
 	@media (max-width: 40rem) {

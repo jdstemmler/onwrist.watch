@@ -83,7 +83,7 @@
 <section class="card">
 	<h2>Calendar</h2>
 	<p class="muted">Dominant watch per day.</p>
-	<CalendarHeatmap calendar={data.calendar} year={data.year} {colorSlots} />
+	<CalendarHeatmap calendar={data.calendar} year={data.year} firstDayKey={data.firstDayKey} todayKey={data.todayKey} {colorSlots} />
 </section>
 
 <section class="card">

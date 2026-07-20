@@ -75,12 +75,12 @@ describe('statsByWatch', () => {
 		expect(d.costPerWearCents).toBeNull(); // no price on Datejust, no wears anyway
 	});
 
-	it('divides by sessions, not days: one wear across midnight is still one wear', async () => {
+	it('a midnight-crossing wear counts once for wears and days worn', async () => {
 		// 11 PM July 13 - 1 AM July 14 PDT = 06:00-08:00Z July 14
 		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-14T06:00:00Z'), endedAt: new Date('2026-07-14T08:00:00Z') });
 		const s = (await statsByWatch(db, alice, TZ, NOW)).find((x) => x.watchId === speedy)!;
 		expect(s.wears).toBe(1);
-		expect(s.distinctDays).toBe(2);
+		expect(s.distinctDays).toBe(1); // bucketed by the day the wear started
 		expect(s.costPerWearCents).toBe(500000);
 	});
 });
