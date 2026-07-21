@@ -1,0 +1,82 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { inArray, eq } from 'drizzle-orm';
+import { createTestDb } from './db/test-utils';
+import type { DB } from './db';
+import { users, watches, wearSessions } from './db/schema';
+import { getOpenSession } from './sessions';
+import { findDemoUser, isDemoHistoryStale, refreshDemoHistory, DEMO_STALE_MS } from './demo';
+
+const HOUR = 3_600_000;
+// Deliberately an early-UTC-hour anchor: regression guard for the seed-timing
+// class of bug (day-1 sessions colliding with the final open session).
+const T0 = new Date('2026-07-16T05:00:00Z');
+
+let db: DB;
+let demoId: number;
+let watchIds: number[];
+
+beforeEach(async () => {
+	db = await createTestDb();
+	const [u] = await db
+		.insert(users)
+		.values({ email: 'demo@x.test', passwordHash: 'x', emailVerifiedAt: T0, isDemo: true })
+		.returning();
+	demoId = u.id;
+	watchIds = [];
+	for (const model of ['One', 'Two', 'Three']) {
+		const [w] = await db.insert(watches).values({ userId: demoId, brand: 'Brand', model }).returning();
+		watchIds.push(w.id);
+	}
+});
+
+async function sessionRows() {
+	return db.select().from(wearSessions).where(inArray(wearSessions.watchId, watchIds));
+}
+
+describe('findDemoUser', () => {
+	it('finds the demo user, null when none', async () => {
+		expect((await findDemoUser(db))?.id).toBe(demoId);
+		await db.update(users).set({ isDemo: false }).where(eq(users.id, demoId));
+		expect(await findDemoUser(db)).toBeNull();
+	});
+});
+
+describe('refreshDemoHistory', () => {
+	it('generates ~120 days of history with exactly one open session at anchor-3h', async () => {
+		await refreshDemoHistory(db, demoId, T0);
+		const rows = await sessionRows();
+		expect(rows.length).toBeGreaterThan(80);
+		const open = rows.filter((r) => r.endedAt === null);
+		expect(open).toHaveLength(1);
+		expect(open[0].startedAt.getTime()).toBe(T0.getTime() - 3 * HOUR);
+		// every closed session ends strictly before the open one starts
+		for (const r of rows) {
+			if (r.endedAt) expect(r.endedAt.getTime()).toBeLessThan(open[0].startedAt.getTime());
+		}
+	});
+
+	it('is deterministic and replaces on re-run instead of accumulating', async () => {
+		await refreshDemoHistory(db, demoId, T0);
+		const first = (await sessionRows()).length;
+		await refreshDemoHistory(db, demoId, new Date(T0.getTime() + 26 * HOUR));
+		expect((await sessionRows()).length).toBe(first);
+	});
+
+	it('no-ops for a user with no watches', async () => {
+		const [bare] = await db
+			.insert(users)
+			.values({ email: 'bare@x.test', passwordHash: 'x' })
+			.returning();
+		await refreshDemoHistory(db, bare.id, T0); // must not throw
+		expect(await getOpenSession(db, bare.id)).toBeNull();
+	});
+});
+
+describe('isDemoHistoryStale', () => {
+	it('true with no history, false right after refresh, true past 24h', async () => {
+		expect(await isDemoHistoryStale(db, demoId, T0)).toBe(true);
+		await refreshDemoHistory(db, demoId, T0);
+		expect(await isDemoHistoryStale(db, demoId, T0)).toBe(false);
+		expect(await isDemoHistoryStale(db, demoId, new Date(T0.getTime() + DEMO_STALE_MS + 4 * HOUR))).toBe(true);
+	});
+});
