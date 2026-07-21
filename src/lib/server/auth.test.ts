@@ -128,7 +128,8 @@ describe('shouldSlideCookie', () => {
 		role: 'member',
 		homeTz: 'America/Los_Angeles',
 		staleSessionHours: 24,
-		verified: true
+		verified: true,
+		isDemo: false
 	};
 	const admin: SessionUser = { ...member, role: 'admin' };
 
