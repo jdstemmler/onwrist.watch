@@ -50,7 +50,7 @@
 				{#each neglect as w (w.watchId)}
 					<li>
 						<span class="swatch" style="background: {slotVar(colorSlots.get(w.watchId) ?? 0)}"></span>
-						<span class="name">{w.label}</span>
+						<a class="name" href="/watches/{w.watchId}">{w.label}</a>
 						<span class="days num">
 							{#if w.daysSince === null}
 								never worn
@@ -85,7 +85,7 @@
 						<tr>
 							<td>
 								<span class="swatch" style="background: {slotVar(colorSlots.get(w.watchId) ?? 0)}"></span>
-								{w.label}
+								<a class="name" href="/watches/{w.watchId}">{w.label}</a>
 							</td>
 							<td class="num">{fmtCents(w.costPerWearCents ?? 0)}</td>
 							<td class="num">{w.distinctDays}</td>
@@ -137,6 +137,12 @@
 	}
 	.name {
 		flex: 1;
+		color: inherit;
+		text-decoration: none;
+	}
+	.name:hover {
+		color: var(--accent);
+		text-decoration: underline;
 	}
 	.days {
 		color: var(--fg-muted);

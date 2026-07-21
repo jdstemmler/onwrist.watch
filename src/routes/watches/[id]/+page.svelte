@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { withPending } from '$lib/pending';
+	import TodChart from '$lib/components/charts/TodChart.svelte';
+	import CalendarHeatmap from '$lib/components/charts/CalendarHeatmap.svelte';
+	import MonthlyTrend from '$lib/components/charts/MonthlyTrend.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -53,6 +56,14 @@
 
 	function money(cents: number, digits = 2): string {
 		return `$${(cents / 100).toFixed(digits)}`;
+	}
+
+	function duration(minutes: number): string {
+		const h = Math.floor(minutes / 60);
+		const m = Math.round(minutes % 60);
+		if (h >= 24) return `${(minutes / 60).toFixed(0)}h`;
+		if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+		return `${m}m`;
 	}
 
 	function fmtDay(d: Date): string {
@@ -175,6 +186,41 @@
 		{/if}
 	</section>
 
+	{#if data.stats.wears > 0}
+		<section class="stat-row">
+			<div class="stat card">
+				<span class="stat-value num">{data.detail.longestStreakDays}d</span>
+				<span class="stat-label muted">Best streak</span>
+			</div>
+			<div class="stat card">
+				<span class="stat-value num">{data.detail.currentStreakDays}d</span>
+				<span class="stat-label muted">Current streak</span>
+			</div>
+			<div class="stat card">
+				<span class="stat-value num">{data.detail.longestGapDays}d</span>
+				<span class="stat-label muted">Longest drought</span>
+			</div>
+			{#if data.detail.medianSessionMinutes != null}
+				<div class="stat card">
+					<span class="stat-value num">{duration(data.detail.medianSessionMinutes)}</span>
+					<span class="stat-label muted">Typical session</span>
+				</div>
+			{/if}
+			{#if data.detail.longestSessionMinutes != null}
+				<div class="stat card">
+					<span class="stat-value num">{duration(data.detail.longestSessionMinutes)}</span>
+					<span class="stat-label muted">Longest session</span>
+				</div>
+			{/if}
+			{#if data.detail.shareOfAllTime != null}
+				<div class="stat card">
+					<span class="stat-value num">{Math.round(data.detail.shareOfAllTime * 100)}%</span>
+					<span class="stat-label muted">Of wrist time</span>
+				</div>
+			{/if}
+		</section>
+	{/if}
+
 	<section class="two-col">
 		<div class="card">
 			<h2>Specification</h2>
@@ -266,6 +312,35 @@
 			{/each}
 		</div>
 	</section>
+
+	{#if data.stats.wears > 0}
+		<section class="card">
+			<h2>Time of day</h2>
+			<p class="chart-sub muted">When this watch goes on, and how much of the day it stays on.</p>
+			<TodChart
+				putOnByHour={data.detail.putOnByHour}
+				wearingShareByHour={data.detail.wearingShareByHour}
+			/>
+		</section>
+
+		<section class="card">
+			<h2>Calendar</h2>
+			<p class="chart-sub muted">Hours on the wrist, per day.</p>
+			<CalendarHeatmap
+				mode="intensity"
+				calendar={data.calendar}
+				year={data.year}
+				firstDayKey={data.detail.firstWornDayKey}
+				todayKey={data.todayKey}
+			/>
+		</section>
+
+		<section class="card">
+			<h2>Monthly hours</h2>
+			<p class="chart-sub muted">Wrist time per month, all time.</p>
+			<MonthlyTrend months={data.detail.byMonth} />
+		</section>
+	{/if}
 
 	<section class="card sessions">
 		<h2>Recent wear</h2>
@@ -466,6 +541,12 @@
 		margin: 0;
 		white-space: pre-line; /* keep the owner's line breaks */
 		color: var(--fg);
+	}
+
+	.chart-sub {
+		margin-top: -0.35rem;
+		margin-bottom: 0.85rem;
+		font-size: 0.85rem;
 	}
 
 	.dow .bars {

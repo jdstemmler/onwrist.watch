@@ -3,7 +3,7 @@ import type { DB } from './db';
 import { createTestDb } from './db/test-utils';
 import { users, watches } from './db/schema';
 import { createSession, putOn } from './sessions';
-import { sliceSession, statsByWatch, statsByDow, statsByTod, statsTodByWatch, statsCalendar, statsSummary } from './stats';
+import { sliceSession, statsByWatch, statsByDow, statsByTod, statsTodByWatch, statsCalendar, statsSummary, statsWatchDetail } from './stats';
 
 const TZ = 'America/Los_Angeles';
 const NOW = new Date('2026-07-15T00:00:00Z'); // 5 PM PDT July 14
@@ -145,6 +145,103 @@ describe('statsByDow / statsByTod / statsCalendar / statsSummary', () => {
 		expect(s.sessions).toBe(2);
 		expect(s.totalHours).toBeCloseTo(16, 5);
 		expect(s.firstLoggedAt).toBe('2026-07-13T14:00:00.000Z');
+	});
+});
+
+describe('statsWatchDetail', () => {
+	// NOW = 2026-07-15T00:00:00Z = Tuesday July 14, 5 PM PDT → todayKey 2026-07-14
+
+	it('put-on hours and wearing share are scoped to the one watch', async () => {
+		// Speedy: Monday July 13, 7 AM - 3 PM PDT (14:00-22:00Z)
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		// Datejust the same week must not leak into Speedy's profile
+		await createSession(db, alice, { watchId: datejust, startedAt: new Date('2026-07-14T15:00:00Z'), endedAt: new Date('2026-07-14T23:00:00Z') });
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.putOnByHour[7]).toBe(1);
+		expect(d.putOnByHour[8]).toBe(0); // Datejust's put-on, not Speedy's
+		// Days observed: first Speedy wear (July 13 14:00Z) → NOW is 34h → 2 days.
+		// Hour 8 fully worn on one of those two days → share 0.5.
+		expect(d.wearingShareByHour[8]).toBeCloseTo(0.5, 5);
+		expect(d.wearingShareByHour[3]).toBe(0);
+		expect(d.firstWornDayKey).toBe('2026-07-13');
+	});
+
+	it('computes streaks, current streak from yesterday, and gaps', async () => {
+		// Worn July 8, 9, 10 (streak of 3), skipped 11-12, worn July 13
+		for (const day of ['08', '09', '10', '13']) {
+			await createSession(db, alice, { watchId: speedy, startedAt: new Date(`2026-07-${day}T16:00:00Z`), endedAt: new Date(`2026-07-${day}T20:00:00Z`) });
+		}
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.longestStreakDays).toBe(3);
+		// Not worn today (July 14) but worn yesterday → streak counts from yesterday.
+		expect(d.currentStreakDays).toBe(1);
+		expect(d.longestGapDays).toBe(2); // July 11 and 12
+	});
+
+	it('a midnight-crossing session extends the streak across both days', async () => {
+		// 11 PM July 13 - 1 AM July 14 PDT (06:00-08:00Z July 14)
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-14T06:00:00Z'), endedAt: new Date('2026-07-14T08:00:00Z') });
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.longestStreakDays).toBe(2);
+		expect(d.currentStreakDays).toBe(2); // worn "today" (July 14) via the tail
+	});
+
+	it('never-worn watch: zeroed streaks, null session stats and share', async () => {
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.longestStreakDays).toBe(0);
+		expect(d.currentStreakDays).toBe(0);
+		expect(d.longestGapDays).toBe(0);
+		expect(d.medianSessionMinutes).toBeNull();
+		expect(d.longestSessionMinutes).toBeNull();
+		expect(d.shareOfAllTime).toBeNull();
+		expect(d.firstWornDayKey).toBeNull();
+		expect(d.days).toEqual([]);
+		expect(d.byMonth).toEqual([]);
+	});
+
+	it('median and longest session lengths; open session clamps to now', async () => {
+		// 2h, 4h closed; open since July 14 14:00Z → 10h at NOW
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-12T14:00:00Z'), endedAt: new Date('2026-07-12T16:00:00Z') });
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T18:00:00Z') });
+		await putOn(db, alice, { watchId: speedy, at: new Date('2026-07-14T14:00:00Z') });
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.medianSessionMinutes).toBe(240);
+		expect(d.longestSessionMinutes).toBe(600);
+	});
+
+	it('median averages the middle pair for an even count', async () => {
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-12T14:00:00Z'), endedAt: new Date('2026-07-12T16:00:00Z') });
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T18:00:00Z') });
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.medianSessionMinutes).toBe(180);
+	});
+
+	it('monthly hours are continuous from first wear month through the current month', async () => {
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-05-10T16:00:00Z'), endedAt: new Date('2026-05-10T20:00:00Z') });
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.byMonth).toEqual([
+			{ month: '2026-05', hours: 4 },
+			{ month: '2026-06', hours: 0 },
+			{ month: '2026-07', hours: 8 }
+		]);
+	});
+
+	it('per-day hours cover every worn day for the heatmap', async () => {
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.days).toContainEqual({ dayKey: '2026-07-13', hours: 8 });
+	});
+
+	it('share of all tracked wrist time', async () => {
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		await createSession(db, alice, { watchId: datejust, startedAt: new Date('2026-07-14T15:00:00Z'), endedAt: new Date('2026-07-14T23:00:00Z') });
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.shareOfAllTime).toBeCloseTo(0.5, 5);
+	});
+
+	it("rejects a watch that isn't yours", async () => {
+		await expect(statsWatchDetail(db, mallory, speedy, TZ, NOW)).rejects.toThrow("That watch isn't yours");
 	});
 });
 
