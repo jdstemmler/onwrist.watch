@@ -4,6 +4,7 @@ import { SESSION_COOKIE, routeClass, validateSession, shouldSlideCookie } from '
 import { sessionCookieOptions } from '$lib/server/flows';
 import { getDb } from '$lib/server/db';
 import { assertConfig } from '$lib/server/config';
+import { demoWriteGate } from '$lib/server/demo-gate';
 
 assertConfig();
 
@@ -44,6 +45,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (token && shouldSlideCookie(event.locals.user)) {
 		event.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(event.locals.user!.role));
 	}
+
+	const demoBlocked = demoWriteGate(event.locals.user, event.request, event.url);
+	if (demoBlocked) return withSecurityHeaders(demoBlocked);
 
 	if (routeClass(pathname) === 'public') return withSecurityHeaders(await resolve(event));
 	if (!event.locals.user) {
