@@ -3,13 +3,22 @@
 
 	type Cell = { dayKey: string; watchId: number; label: string; hours: number };
 
-	let { calendar, year, firstDayKey, todayKey, colorSlots }: {
+	// 'dominant' (default): each day colored by the watch worn most, categorical
+	// palette + watch legend — the /stats view. 'intensity': all cells are one
+	// watch; a sequential accent ramp encodes hours worn — the per-watch view.
+	let { calendar, year, firstDayKey, todayKey, colorSlots = new Map(), mode = 'dominant' }: {
 		calendar: Cell[];
 		year: number;
 		firstDayKey: string | null;
 		todayKey: string;
-		colorSlots: Map<number, number>;
+		colorSlots?: Map<number, number>;
+		mode?: 'dominant' | 'intensity';
 	} = $props();
+
+	const maxHours = $derived(Math.max(1, ...calendar.map((c) => c.hours)));
+	function level(hours: number): number {
+		return Math.min(4, Math.max(1, Math.ceil((hours / maxHours) * 4)));
+	}
 
 	const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -104,7 +113,9 @@
 			viewBox="0 0 {LEFT_PAD + colCount * STEP} {TOP_PAD + 7 * STEP}"
 			role="img"
 			aria-label="Calendar heatmap, {days[0]?.dayKey ?? year} through {days.at(-1)?.dayKey ??
-				year}, colored by the watch worn most that day"
+				year}, {mode === 'intensity'
+				? 'shaded by hours worn that day'
+				: 'colored by the watch worn most that day'}"
 		>
 			{#each monthLabels as m}
 				<text x={LEFT_PAD + m.col * STEP} y={TOP_PAD - 5} class="month">{m.label}</text>
@@ -120,17 +131,36 @@
 					width={CELL}
 					height={CELL}
 					rx="2"
-					class="cell"
+					class="cell {cell && mode === 'intensity' ? `lvl-${level(cell.hours)}` : ''}"
 					class:empty={!cell}
-					fill={cell ? slotVar(colorSlots.get(cell.watchId) ?? 0) : undefined}
+					fill={cell && mode === 'dominant' ? slotVar(colorSlots.get(cell.watchId) ?? 0) : undefined}
 				>
-					<title>{d.dayKey} · {cell ? `${cell.label} · ${fmtHours(cell.hours)}h` : 'no wear'}</title>
+					<title
+						>{d.dayKey} · {cell
+							? mode === 'intensity'
+								? `${fmtHours(cell.hours)}h`
+								: `${cell.label} · ${fmtHours(cell.hours)}h`
+							: 'no wear'}</title
+					>
 				</rect>
 			{/each}
 		</svg>
 	</div>
 
-	{#if legend.length > 0}
+	{#if mode === 'intensity'}
+		{#if calendar.length > 0}
+			<ul class="legend">
+				<li class="ramp">
+					Less
+					{#each [1, 2, 3, 4] as l (l)}
+						<span class="swatch lvl-{l}"></span>
+					{/each}
+					More
+				</li>
+				<li><span class="swatch empty-swatch"></span> No wear</li>
+			</ul>
+		{/if}
+	{:else if legend.length > 0}
 		<ul class="legend">
 			{#each legend as [watchId, label] (watchId)}
 				<li>
@@ -188,6 +218,28 @@
 	}
 	.cell.empty {
 		fill: color-mix(in srgb, var(--border) 60%, transparent);
+	}
+	/* Sequential accent ramp for intensity mode — one hue, light→dark, quartile
+	   bins of the year's max day. Shared by cells (fill) and legend swatches
+	   (background). */
+	.lvl-1 {
+		fill: color-mix(in srgb, var(--accent) 30%, var(--bg-raised));
+		background: color-mix(in srgb, var(--accent) 30%, var(--bg-raised));
+	}
+	.lvl-2 {
+		fill: color-mix(in srgb, var(--accent) 55%, var(--bg-raised));
+		background: color-mix(in srgb, var(--accent) 55%, var(--bg-raised));
+	}
+	.lvl-3 {
+		fill: color-mix(in srgb, var(--accent) 78%, var(--bg-raised));
+		background: color-mix(in srgb, var(--accent) 78%, var(--bg-raised));
+	}
+	.lvl-4 {
+		fill: var(--accent);
+		background: var(--accent);
+	}
+	.ramp {
+		gap: 0.25rem;
 	}
 	.legend {
 		display: flex;

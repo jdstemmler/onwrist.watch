@@ -30,7 +30,7 @@
 		<ul class="rows">
 			{#each sorted as r (r.watchId)}
 				<li class="row">
-					<span class="label" title={r.label}>{r.label}</span>
+					<a class="label" href="/watches/{r.watchId}" title={r.label}>{r.label}</a>
 					<span
 						class="track"
 						role="img"
@@ -99,6 +99,12 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		color: inherit;
+		text-decoration: none;
+	}
+	.label:hover {
+		color: var(--accent);
+		text-decoration: underline;
 	}
 	.track {
 		position: relative;

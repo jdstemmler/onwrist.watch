@@ -1,7 +1,7 @@
 import { asc, eq, getTableColumns } from 'drizzle-orm';
 import type { DB } from './db';
 import { watches, wearSessions, type Watch, type WearSession } from './db/schema';
-import { watchLabel } from './sessions';
+import { assertWatchOwned, watchLabel } from './sessions';
 import { zonedParts } from './time';
 
 export type HourSlice = { hour: number; dow: number; dayKey: string; minutes: number };
@@ -137,6 +137,143 @@ export async function statsByTod(db: DB, userId: number, tz: string, now: Date) 
 		: 1;
 	const wearingShareByHour = minutesByHour.map((m) => m / (daysObserved * 60));
 	return { putOnByHour, wearingShareByHour };
+}
+
+export type WatchDetailStats = {
+	putOnByHour: number[];
+	wearingShareByHour: number[];
+	days: { dayKey: string; hours: number }[];
+	byMonth: { month: string; hours: number }[];
+	longestStreakDays: number;
+	currentStreakDays: number;
+	longestGapDays: number;
+	medianSessionMinutes: number | null;
+	longestSessionMinutes: number | null;
+	shareOfAllTime: number | null;
+	firstWornDayKey: string | null;
+};
+
+const DAY_MS = 86_400_000;
+
+function keyToUtc(k: string): number {
+	const [y, m, d] = k.split('-').map(Number);
+	return Date.UTC(y, m - 1, d);
+}
+
+export async function statsWatchDetail(
+	db: DB,
+	userId: number,
+	watchId: number,
+	tz: string,
+	now: Date
+): Promise<WatchDetailStats> {
+	await assertWatchOwned(db, userId, watchId);
+	const { clamped } = await loadAll(db, userId, now);
+	const mine = clamped.filter((s) => s.watchId === watchId);
+
+	const putOnByHour = Array(24).fill(0);
+	const minutesByHour = Array(24).fill(0);
+	const dayMinutes = new Map<string, number>();
+	let totalMinutes = 0;
+	let mineMinutes = 0;
+	for (const s of clamped) {
+		const isMine = s.watchId === watchId;
+		if (isMine) putOnByHour[zonedParts(s.startedAt, tz).hour]++;
+		for (const slice of sliceSession(s.startedAt, s.endedAt, tz)) {
+			totalMinutes += slice.minutes;
+			if (!isMine) continue;
+			mineMinutes += slice.minutes;
+			minutesByHour[slice.hour] += slice.minutes;
+			dayMinutes.set(slice.dayKey, (dayMinutes.get(slice.dayKey) ?? 0) + slice.minutes);
+		}
+	}
+
+	// Share of the day this watch was on the wrist, per hour, over the days
+	// since its own first wear — same semantic as statsByTod's wearing share,
+	// scoped to one watch.
+	const daysObserved = mine.length
+		? Math.max(1, Math.ceil((now.getTime() - mine[0].startedAt.getTime()) / DAY_MS))
+		: 1;
+	const wearingShareByHour = minutesByHour.map((m) => m / (daysObserved * 60));
+
+	// Streaks walk the distinct local days that saw any wrist time, so a
+	// midnight-crossing session keeps a streak alive on both days.
+	const dayKeys = [...dayMinutes.keys()].sort();
+	let longestStreakDays = 0;
+	let longestGapDays = 0;
+	let run = 0;
+	let prev: number | null = null;
+	for (const k of dayKeys) {
+		const t = keyToUtc(k);
+		if (prev !== null && t - prev === DAY_MS) run++;
+		else {
+			if (prev !== null) longestGapDays = Math.max(longestGapDays, (t - prev) / DAY_MS - 1);
+			run = 1;
+		}
+		longestStreakDays = Math.max(longestStreakDays, run);
+		prev = t;
+	}
+	const todayKey = zonedParts(now, tz).dayKey;
+	if (prev !== null) {
+		// An ongoing drought counts too — a watch untouched since spring should
+		// show that, not just its worst historical gap.
+		longestGapDays = Math.max(longestGapDays, Math.max(0, (keyToUtc(todayKey) - prev) / DAY_MS - 1));
+	}
+	const worn = new Set(dayKeys);
+	// Worn today keeps the streak alive; not-yet-today falls back to yesterday
+	// so a live streak doesn't read as 0 all morning.
+	let cursor = worn.has(todayKey) ? keyToUtc(todayKey) : keyToUtc(todayKey) - DAY_MS;
+	let currentStreakDays = 0;
+	while (true) {
+		const d = new Date(cursor);
+		const k = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+		if (!worn.has(k)) break;
+		currentStreakDays++;
+		cursor -= DAY_MS;
+	}
+
+	const durations = mine
+		.map((s) => (s.endedAt.getTime() - s.startedAt.getTime()) / 60_000)
+		.sort((a, b) => a - b);
+	const mid = durations.length >> 1;
+	const medianSessionMinutes = durations.length
+		? durations.length % 2
+			? durations[mid]
+			: (durations[mid - 1] + durations[mid]) / 2
+		: null;
+	const longestSessionMinutes = durations.length ? durations[durations.length - 1] : null;
+
+	const monthMinutes = new Map<string, number>();
+	for (const [k, m] of dayMinutes) {
+		const month = k.slice(0, 7);
+		monthMinutes.set(month, (monthMinutes.get(month) ?? 0) + m);
+	}
+	const byMonth: { month: string; hours: number }[] = [];
+	if (dayKeys.length) {
+		let y = Number(dayKeys[0].slice(0, 4));
+		let m = Number(dayKeys[0].slice(5, 7));
+		const endY = Number(todayKey.slice(0, 4));
+		const endM = Number(todayKey.slice(5, 7));
+		while (y < endY || (y === endY && m <= endM)) {
+			const month = `${y}-${String(m).padStart(2, '0')}`;
+			byMonth.push({ month, hours: (monthMinutes.get(month) ?? 0) / 60 });
+			if (++m === 13) { m = 1; y++; }
+		}
+	}
+
+	return {
+		putOnByHour,
+		wearingShareByHour,
+		days: dayKeys.map((k) => ({ dayKey: k, hours: dayMinutes.get(k)! / 60 })),
+		byMonth,
+		longestStreakDays,
+		currentStreakDays,
+		longestGapDays,
+		medianSessionMinutes,
+		longestSessionMinutes,
+		shareOfAllTime: totalMinutes > 0 ? mineMinutes / totalMinutes : null,
+		firstWornDayKey: dayKeys[0] ?? null
+	};
 }
 
 export async function statsCalendar(db: DB, userId: number, tz: string, year: number, now: Date) {
