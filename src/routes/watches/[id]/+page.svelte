@@ -330,7 +330,7 @@
 				mode="intensity"
 				calendar={data.calendar}
 				year={data.year}
-				firstDayKey={data.detail.firstWornDayKey}
+				firstDayKey={data.detail.trackingSinceDayKey}
 				todayKey={data.todayKey}
 			/>
 		</section>
