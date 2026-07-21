@@ -2,6 +2,9 @@ import { asc, eq, inArray } from 'drizzle-orm';
 import type { DB } from './db';
 import { users, watches, wearSessions } from './db/schema';
 import { createSession, getOpenSession, lockUser, putOn } from './sessions';
+import { createSession as createAuthSession } from './auth';
+import { sessionCookieOptions, type CookieOptions } from './flows';
+import { rateLimit } from './rate-limit';
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -103,4 +106,30 @@ export async function refreshDemoHistory(db: DB, userId: number, anchor = new Da
 		// Leave the demo "currently wearing" its favorite.
 		await putOn(tx, userId, { watchId: ids[0], at: openStart, source: 'web' });
 	});
+}
+
+export type DemoLoginResult =
+	| { ok: true; token: string; cookie: CookieOptions }
+	| { ok: false; status: number; message: string };
+
+/** Signs a visitor into the shared demo account: rate-limited per IP,
+ * re-anchors stale history first (best-effort — a refresh failure logs and
+ * falls through; stale data beats an error page). */
+export async function demoLogin(db: DB, ip: string, now = new Date()): Promise<DemoLoginResult> {
+	if (!(await rateLimit(db, 'demoIp', `demo:ip:${ip}`, now))) {
+		return { ok: false, status: 429, message: 'Too many attempts — try again later' };
+	}
+	const demo = await findDemoUser(db);
+	if (!demo) {
+		return { ok: false, status: 404, message: 'This instance has no demo account' };
+	}
+	try {
+		if (await isDemoHistoryStale(db, demo.id, now)) {
+			await refreshDemoHistory(db, demo.id, now);
+		}
+	} catch (e) {
+		console.error('[demo] history refresh failed; continuing with stale data:', e);
+	}
+	const token = await createAuthSession(db, demo.id, now);
+	return { ok: true, token, cookie: sessionCookieOptions('member') };
 }

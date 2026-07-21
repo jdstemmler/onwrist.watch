@@ -4,7 +4,8 @@ import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
 import { users, watches, wearSessions } from './db/schema';
 import { getOpenSession } from './sessions';
-import { findDemoUser, isDemoHistoryStale, refreshDemoHistory, DEMO_STALE_MS } from './demo';
+import { findDemoUser, isDemoHistoryStale, refreshDemoHistory, DEMO_STALE_MS, demoLogin } from './demo';
+import { validateSession } from './auth';
 
 const HOUR = 3_600_000;
 // Deliberately an early-UTC-hour anchor: regression guard for the seed-timing
@@ -78,5 +79,42 @@ describe('isDemoHistoryStale', () => {
 		await refreshDemoHistory(db, demoId, T0);
 		expect(await isDemoHistoryStale(db, demoId, T0)).toBe(false);
 		expect(await isDemoHistoryStale(db, demoId, new Date(T0.getTime() + DEMO_STALE_MS + 4 * HOUR))).toBe(true);
+	});
+});
+
+describe('demoLogin', () => {
+	it('mints a session for the demo user and refreshes stale history', async () => {
+		const r = await demoLogin(db, '198.51.100.7', T0);
+		expect(r.ok).toBe(true);
+		if (!r.ok) return;
+		expect((await validateSession(db, r.token, T0))?.isDemo).toBe(true);
+		expect(r.cookie.httpOnly).toBe(true);
+		// history was empty -> stale -> refreshed
+		const open = await getOpenSession(db, demoId);
+		expect(open?.startedAt.getTime()).toBe(T0.getTime() - 3 * HOUR);
+	});
+
+	it('does not refresh when history is fresh', async () => {
+		await refreshDemoHistory(db, demoId, T0);
+		const before = (await sessionRows()).map((r) => r.id).sort();
+		const later = new Date(T0.getTime() + 2 * HOUR);
+		expect((await demoLogin(db, '198.51.100.7', later)).ok).toBe(true);
+		const after = (await sessionRows()).map((r) => r.id).sort();
+		expect(after).toEqual(before); // same rows — no wipe happened
+	});
+
+	it('404s when no demo user exists', async () => {
+		await db.update(users).set({ isDemo: false }).where(eq(users.id, demoId));
+		const r = await demoLogin(db, '198.51.100.7', T0);
+		expect(r).toMatchObject({ ok: false, status: 404 });
+	});
+
+	it('rate limits per IP', async () => {
+		for (let i = 0; i < 10; i++) {
+			expect((await demoLogin(db, '203.0.113.9', T0)).ok).toBe(true);
+		}
+		const r = await demoLogin(db, '203.0.113.9', T0);
+		expect(r).toMatchObject({ ok: false, status: 429 });
+		expect((await demoLogin(db, '198.51.100.7', T0)).ok).toBe(true); // other IPs unaffected
 	});
 });
