@@ -166,6 +166,16 @@ describe('statsWatchDetail', () => {
 		expect(d.firstWornDayKey).toBe('2026-07-13');
 	});
 
+	it('tracking-since spans all watches, not just this one', async () => {
+		// Datejust starts the log July 10; Speedy first worn July 13. Speedy's
+		// heatmap must still reach back to July 10 so the no-wear lead-in shows.
+		await createSession(db, alice, { watchId: datejust, startedAt: new Date('2026-07-10T16:00:00Z'), endedAt: new Date('2026-07-10T20:00:00Z') });
+		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
+		const d = await statsWatchDetail(db, alice, speedy, TZ, NOW);
+		expect(d.firstWornDayKey).toBe('2026-07-13');
+		expect(d.trackingSinceDayKey).toBe('2026-07-10');
+	});
+
 	it('computes streaks, current streak from yesterday, and gaps', async () => {
 		// Worn July 8, 9, 10 (streak of 3), skipped 11-12, worn July 13
 		for (const day of ['08', '09', '10', '13']) {
@@ -195,6 +205,7 @@ describe('statsWatchDetail', () => {
 		expect(d.longestSessionMinutes).toBeNull();
 		expect(d.shareOfAllTime).toBeNull();
 		expect(d.firstWornDayKey).toBeNull();
+		expect(d.trackingSinceDayKey).toBeNull();
 		expect(d.days).toEqual([]);
 		expect(d.byMonth).toEqual([]);
 	});

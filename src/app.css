@@ -167,6 +167,27 @@ input[type='file'] {
 	padding: 0.45rem 0.65rem;
 }
 
+/* iOS Safari draws date/time inputs as a shrink-wrapped system control that
+   ignores width:100% and overflows its card. Stripping the native appearance
+   makes them size like every other input; every one of these lives inside a
+   label.field, which supplies the width. */
+input[type='date'],
+input[type='datetime-local'] {
+	appearance: none;
+	-webkit-appearance: none;
+	display: block;
+	min-width: 0;
+	max-width: 100%;
+}
+
+/* With appearance:none, iOS centers the value text and collapses the control
+   to zero text height while empty. */
+input[type='date']::-webkit-date-and-time-value,
+input[type='datetime-local']::-webkit-date-and-time-value {
+	text-align: left;
+	min-height: 1.3em;
+}
+
 /* Shared field vocabulary: <label class="field"><span class="lbl">…</span><input/></label>
    Keeps caption + required mark on one line and label rhythm identical across pages. */
 label.field {

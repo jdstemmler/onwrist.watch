@@ -151,6 +151,7 @@ export type WatchDetailStats = {
 	longestSessionMinutes: number | null;
 	shareOfAllTime: number | null;
 	firstWornDayKey: string | null;
+	trackingSinceDayKey: string | null;
 };
 
 const DAY_MS = 86_400_000;
@@ -272,7 +273,11 @@ export async function statsWatchDetail(
 		medianSessionMinutes,
 		longestSessionMinutes,
 		shareOfAllTime: totalMinutes > 0 ? mineMinutes / totalMinutes : null,
-		firstWornDayKey: dayKeys[0] ?? null
+		firstWornDayKey: dayKeys[0] ?? null,
+		// First wear of *any* watch, not just this one: the heatmap grid pins
+		// its start here so the no-wear days before this watch's first wear
+		// render as data, not as a missing span.
+		trackingSinceDayKey: clamped.length ? zonedParts(clamped[0].startedAt, tz).dayKey : null
 	};
 }
 

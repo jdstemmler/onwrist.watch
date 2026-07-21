@@ -31,11 +31,11 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 			.orderBy(desc(wearSessions.startedAt))
 			.limit(20)
 	]);
-	// Same year clamping as /stats, but spanning this watch's own history:
-	// first-worn-year..current-year (homeTz), so empty years are unreachable.
+	// Same year clamping as /stats, spanning the whole tracked history — not
+	// just this watch's — so a year of all-no-wear cells is still reachable.
 	const todayParts = zonedParts(now, homeTz);
-	const firstYear = detail.firstWornDayKey
-		? Number(detail.firstWornDayKey.slice(0, 4))
+	const firstYear = detail.trackingSinceDayKey
+		? Number(detail.trackingSinceDayKey.slice(0, 4))
 		: todayParts.year;
 	const requested = Number(url.searchParams.get('year') ?? todayParts.year);
 	const year = Number.isFinite(requested)
