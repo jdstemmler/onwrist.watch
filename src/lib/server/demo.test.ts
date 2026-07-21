@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { inArray, eq } from 'drizzle-orm';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { inArray, eq, sql } from 'drizzle-orm';
 import { createTestDb } from './db/test-utils';
 import type { DB } from './db';
 import { users, watches, wearSessions } from './db/schema';
@@ -116,5 +116,21 @@ describe('demoLogin', () => {
 		const r = await demoLogin(db, '203.0.113.9', T0);
 		expect(r).toMatchObject({ ok: false, status: 429 });
 		expect((await demoLogin(db, '198.51.100.7', T0)).ok).toBe(true); // other IPs unaffected
+	});
+
+	it('still logs the visitor in when the history refresh fails', async () => {
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			// Real breakage, no mocks: without the wear_sessions table the
+			// staleness check inside demoLogin throws; login must survive it.
+			await db.execute(sql`drop table wear_sessions`);
+			const r = await demoLogin(db, '198.51.100.7', T0);
+			expect(r.ok).toBe(true);
+			if (!r.ok) return;
+			expect((await validateSession(db, r.token, T0))?.isDemo).toBe(true);
+			expect(errSpy).toHaveBeenCalled();
+		} finally {
+			errSpy.mockRestore();
+		}
 	});
 });
