@@ -513,24 +513,6 @@ form:focus-within .dot {
 	display: inline-block;
 }
 
-/* Second-cycle marker: once a collection passes 11 watches the categorical
-   hues recycle (slotVar wraps), so slotTier() flags the recycled swatches in
-   legends/chips with an inset surface-colored ring — a "hollow" swatch that
-   survives CVD, print, and forced-colors, telling a recycled hue apart from
-   its first-cycle twin. Only ever set on legend/chip swatches, never on the
-   plotted marks (cells/segments/bars). */
-.chart-palette .swatch.repeat {
-	box-shadow: inset 0 0 0 2px var(--bg-raised);
-}
-
-/* Footnote that explains the .repeat ring; shown in a legend only when at
-   least one recycled hue is present. Breaks to its own line within the
-   wrapping legend flex row. */
-.chart-palette .legend-note {
-	flex-basis: 100%;
-	font-style: italic;
-}
-
 /* Motion here is decorative (hover lifts, short fades, the lume-dot glow) —
    honor the OS-level request to keep still. */
 @media (prefers-reduced-motion: reduce) {
