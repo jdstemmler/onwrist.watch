@@ -6,23 +6,32 @@
 	const REPO = 'https://github.com/jdstemmler/onwrist.watch';
 </script>
 
-<section class="hero">
-	<div class="pitch">
+<section class="hero band">
+	<div class="copy">
 		<p class="kicker"><span class="dot solid"></span>Watch collection tracker</p>
 		<h1>{appName}</h1>
 		<p class="tagline">
-			Log what's on your wrist, track your collection, and see where the hours go. Free — no
-			subscription.
+			Track your collection and log every wear, so you can see what you actually reach for. Free —
+			no subscription.
 		</p>
-		<div class="actions">
-			<a class="button primary" href="/signup">Create account</a>
-			<a class="button ghost" href="/login">Sign in</a>
+		<ul class="features">
+			<li>One tap to log the watch on your wrist</li>
+			<li>Photos and details for every piece</li>
+			<li>Installable app — add it to your home screen</li>
+		</ul>
+		<div class="cta-group">
+			<div class="actions">
+				<a class="button primary" href="/signup">Create account</a>
+				<a class="button ghost" href="/login">Sign in</a>
+			</div>
+			{#if demoAvailable}
+				<form class="demo-form" method="POST" action="/?/demo" use:enhance>
+					<button type="submit" class="button demo-cta">
+						Try the live demo <span aria-hidden="true">→</span>
+					</button>
+				</form>
+			{/if}
 		</div>
-		{#if demoAvailable}
-			<form class="demo-form" method="POST" action="/?/demo" use:enhance>
-				<button type="submit" class="demo-link">Try the demo <span aria-hidden="true">→</span></button>
-			</form>
-		{/if}
 		{#if page.form?.message}
 			<p class="demo-error" role="alert">{page.form.message}</p>
 		{/if}
@@ -34,16 +43,24 @@
 	</figure>
 </section>
 
-<section class="band">
-	<div class="band-copy">
+<section class="stats band">
+	<div class="copy">
 		<p class="kicker"><span class="dot solid"></span>Wear stats, automatically</p>
 		<h2>See where the hours go</h2>
 		<p class="tagline">
-			Wrist-time share, day-of-week rhythm, time-of-day habits, a wear calendar, and cost-per-wear —
-			all computed from your log.
+			Every wear session rolls up into the numbers behind your habits — no spreadsheet required.
 		</p>
+		<ul class="features">
+			<li>Wrist-time share and rotation health</li>
+			<li>Day-of-week and time-of-day rhythms</li>
+			<li>A wear calendar, colored by watch</li>
+			<li>Cost-per-wear on every piece</li>
+		</ul>
+		<div class="actions">
+			<a class="button ghost" href="/signup">Start your log <span aria-hidden="true">→</span></a>
+		</div>
 	</div>
-	<figure class="shot shot-stats" aria-hidden="true">
+	<figure class="shot" aria-hidden="true">
 		<img class="shot-light" src="/landing/stats-light.webp" alt="" loading="lazy" />
 		<img class="shot-dark" src="/landing/stats-dark.webp" alt="" loading="lazy" />
 	</figure>
@@ -68,72 +85,100 @@
 </footer>
 
 <style>
-	.hero {
+	/* Two feature bands share one layout: a text column and a framed product
+	   shot, vertically centered, with the whole pair centered in the page. */
+	.band {
 		display: grid;
-		grid-template-columns: minmax(15rem, 24rem) 1fr;
+		grid-template-columns: minmax(15rem, 26rem) minmax(0, 34rem);
+		justify-content: center;
 		align-items: center;
-		gap: 3rem;
+		gap: clamp(2rem, 5vw, 4rem);
 		padding-block: clamp(1.5rem, 5vw, 3.5rem);
 	}
+	.stats {
+		border-top: 1px solid var(--border);
+	}
 
-	.pitch {
+	.copy {
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
 		gap: 1.1rem;
 	}
 
-	/* .kicker/.dot come from app.css — this hero's dot is permanently lit
+	/* .kicker/.dot come from app.css — these dots are permanently lit
 	   (class="dot solid"), there's no on/off state to represent. */
 
-	.pitch h1 {
+	/* text-wrap: balance evens the rag so a heading can't strand a single
+	   word on its own line at any width (older browsers just skip it). */
+	.hero h1 {
 		font-size: clamp(2.4rem, 6vw, 3.4rem);
 		text-transform: lowercase;
 		letter-spacing: 0.02em;
 		margin: 0;
+		text-wrap: balance;
+	}
+	.stats h2 {
+		font-size: clamp(1.5rem, 3.5vw, 2rem);
+		margin: 0;
+		text-wrap: balance;
 	}
 
 	.tagline {
 		font-size: 1.05rem;
 		line-height: 1.55;
 		color: var(--fg-muted);
-		max-width: 32ch;
+		max-width: 34ch;
 		margin: 0;
 	}
 
+	/* Spec-sheet feature list: monospace to echo the engraving vocabulary the
+	   app uses for every watch label, each line led by an olive tick. */
+	.features {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+	.features li {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6rem;
+		font-family: var(--font-display);
+		font-size: 0.85rem;
+		line-height: 1.35;
+		color: var(--fg);
+	}
+	.features li::before {
+		content: '';
+		flex: none;
+		width: 0.4rem;
+		height: 0.4rem;
+		border-radius: 50%;
+		background: var(--accent);
+		transform: translateY(-0.1rem);
+	}
+
+	/* The CTA pair and the demo button share one fit-content column so the
+	   full-width demo button stretches to exactly the pair's width — both
+	   rows' edges line up. */
+	.cta-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+		width: fit-content;
+		margin-top: 0.3rem;
+	}
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.8rem;
-		margin-top: 0.4rem;
 	}
 	.actions .button {
 		padding: 0.65rem 1.4rem;
 		font-size: 0.95rem;
-	}
-	.demo-form {
-		margin: 1rem 0 0;
-	}
-	.demo-link {
-		background: none;
-		border: 0;
-		padding: 0;
-		font-family: var(--font-display);
-		font-size: 0.8rem;
-		font-weight: 600;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
-		cursor: pointer;
-	}
-	.demo-link:hover {
-		color: var(--fg);
-	}
-
-	.demo-error {
-		margin: 0.5rem 0 0;
-		font-size: 0.85rem;
-		color: var(--danger);
 	}
 	/* balanced pair: solid primary + outlined secondary (same footprint) */
 	.button.ghost {
@@ -146,19 +191,64 @@
 		background: color-mix(in srgb, var(--fg) 5%, transparent);
 	}
 
-	/* Framed product shots */
-	.shot {
+	/* Demo: a full-width, lower-emphasis link-button on its own row below the
+	   two primary CTAs — never in the CTA row (a third button orphan-wraps at
+	   phone widths). */
+	.demo-form {
+		width: 100%;
 		margin: 0;
+	}
+	.demo-cta {
+		width: 100%;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.4rem;
+		padding: 0.6rem 1rem;
+		background: transparent;
+		border: 1px solid var(--border);
+		color: var(--fg-muted);
+		font-size: 0.9rem;
+	}
+	.demo-cta:hover {
+		border-color: var(--accent);
+		color: var(--fg);
+	}
+
+	.demo-error {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--danger);
+	}
+
+	/* Framed product shots: capped height with a bottom fade so the cropped
+	   edge reads as "more below" instead of a hard mid-card clip, and so the
+	   bright light-theme shot doesn't dead-end as a hard rectangle. */
+	.shot {
+		position: relative;
+		width: 100%;
+		max-width: 34rem;
+		max-height: 22rem;
+		margin: 0;
+		overflow: hidden;
 		border-radius: var(--radius);
 		border: 1px solid var(--border);
 		box-shadow: var(--shadow);
-		overflow: hidden;
 		background: var(--bg-raised);
-		max-height: 30rem;
 	}
 	.shot img {
 		width: 100%;
 		height: auto;
+	}
+	.shot::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 4.5rem;
+		background: linear-gradient(to bottom, transparent, var(--bg-raised));
+		pointer-events: none;
 	}
 	/* base display lives on the toggle classes (not `.shot img`) so the
 	   `.shot-dark { display: none }` default can't be out-specificity'd by a
@@ -166,28 +256,6 @@
 	.shot-light,
 	.shot-dark {
 		display: block;
-	}
-
-	.band {
-		display: grid;
-		grid-template-columns: minmax(15rem, 24rem) 1fr;
-		align-items: center;
-		gap: 3rem;
-		padding-block: clamp(1.5rem, 5vw, 3rem);
-		border-top: 1px solid var(--border);
-	}
-	.band-copy {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 0.9rem;
-	}
-	.band-copy h2 {
-		font-size: clamp(1.5rem, 3.5vw, 2rem);
-		margin: 0;
-	}
-	.shot-stats {
-		max-height: 26rem;
 	}
 
 	/* Light/dark screenshot pairs — mirror app.css's two-way dark selection
@@ -254,22 +322,25 @@
 		color: inherit;
 	}
 
-	@media (max-width: 46rem) {
-		.hero,
+	@media (max-width: 52rem) {
 		.band {
 			grid-template-columns: 1fr;
 			gap: 1.75rem;
+			justify-items: center;
 		}
-		.pitch,
-		.band-copy {
+		.copy {
 			align-items: center;
 			text-align: center;
+			max-width: 34rem;
 		}
-		.tagline {
-			max-width: 36ch;
+		.features li {
+			text-align: left;
 		}
-		.shot {
-			max-height: 24rem;
+		.actions {
+			justify-content: center;
+		}
+		.demo-form {
+			align-self: center;
 		}
 		.credit {
 			margin-left: 0;
