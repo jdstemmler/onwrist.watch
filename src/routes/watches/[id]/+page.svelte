@@ -165,7 +165,10 @@
 	</section>
 	{/if}
 
-	<section class="stat-row">
+	<!-- One shared grid for every stat tile — core counts first, then the
+	     deeper wear metrics — so both sets keep a single column rhythm instead
+	     of two separately-wrapping rows that don't line up. -->
+	<section class="stat-grid">
 		<div class="stat card">
 			<span class="stat-value num">{data.stats.wears}</span>
 			<span class="stat-label muted">Wears</span>
@@ -184,10 +187,7 @@
 				<span class="stat-label muted">Per wear</span>
 			</div>
 		{/if}
-	</section>
-
-	{#if data.stats.wears > 0}
-		<section class="stat-row">
+		{#if data.stats.wears > 0}
 			<div class="stat card">
 				<span class="stat-value num">{data.detail.longestStreakDays}d</span>
 				<span class="stat-label muted">Best streak</span>
@@ -218,8 +218,8 @@
 					<span class="stat-label muted">Of wrist time</span>
 				</div>
 			{/if}
-		</section>
-	{/if}
+		{/if}
+	</section>
 
 	<section class="two-col">
 		<div class="card">
@@ -463,14 +463,13 @@
 		display: block;
 	}
 
-	.stat-row {
-		display: flex;
-		flex-wrap: wrap;
+	.stat-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
 		gap: 0.75rem;
 	}
 
 	.stat {
-		flex: 1 1 8rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.15rem;

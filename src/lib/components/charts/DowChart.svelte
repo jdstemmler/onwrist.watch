@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { slotVar, niceTicks } from './palette';
+	import { slotVar, slotTier, niceTicks } from './palette';
 
 	type Row = { dow: number; watchId: number; label: string; hours: number };
 
@@ -45,6 +45,7 @@
 		for (const r of rows) if (!seen.has(r.watchId)) seen.set(r.watchId, r.label);
 		return [...seen.entries()].sort((a, b) => a[0] - b[0]);
 	});
+	const anyRepeat = $derived(legend.some(([id]) => slotTier(colorSlots.get(id) ?? 0) >= 1));
 
 	function fmtHours(h: number) {
 		return (Math.round(h * 10) / 10).toString();
@@ -84,10 +85,17 @@
 		<ul class="legend">
 			{#each legend as [watchId, label] (watchId)}
 				<li>
-					<span class="swatch" style="background: {slotVar(colorSlots.get(watchId) ?? 0)}"></span>
+					<span
+						class="swatch"
+						class:repeat={slotTier(colorSlots.get(watchId) ?? 0) >= 1}
+						style="background: {slotVar(colorSlots.get(watchId) ?? 0)}"
+					></span>
 					{label}
 				</li>
 			{/each}
+			{#if anyRepeat}
+				<li class="legend-note">ringed = 2nd color cycle</li>
+			{/if}
 		</ul>
 	{/if}
 </div>

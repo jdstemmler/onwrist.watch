@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { slotVar } from './palette';
+	import { slotVar, slotTier } from './palette';
 
 	type Cell = { dayKey: string; watchId: number; label: string; hours: number };
 
@@ -79,6 +79,7 @@
 		for (const c of calendar) if (!seen.has(c.watchId)) seen.set(c.watchId, c.label);
 		return [...seen.entries()].sort((a, b) => a[0] - b[0]);
 	});
+	const anyRepeat = $derived(legend.some(([id]) => slotTier(colorSlots.get(id) ?? 0) >= 1));
 
 	const CELL = 12;
 	const GAP = 2;
@@ -106,8 +107,9 @@
 		{/if}
 	</div>
 
-	<div class="grid-scroll">
-		<svg
+	<div class="plot-row">
+		<div class="grid-scroll">
+			<svg
 			width={LEFT_PAD + colCount * STEP}
 			height={TOP_PAD + 7 * STEP}
 			viewBox="0 0 {LEFT_PAD + colCount * STEP} {TOP_PAD + 7 * STEP}"
@@ -164,13 +166,21 @@
 		<ul class="legend">
 			{#each legend as [watchId, label] (watchId)}
 				<li>
-					<span class="swatch" style="background: {slotVar(colorSlots.get(watchId) ?? 0)}"></span>
+					<span
+						class="swatch"
+						class:repeat={slotTier(colorSlots.get(watchId) ?? 0) >= 1}
+						style="background: {slotVar(colorSlots.get(watchId) ?? 0)}"
+					></span>
 					{label}
 				</li>
 			{/each}
 			<li><span class="swatch empty-swatch"></span> No wear</li>
+			{#if anyRepeat}
+				<li class="legend-note">ringed = 2nd color cycle</li>
+			{/if}
 		</ul>
 	{/if}
+	</div>
 </div>
 
 <style>
@@ -199,8 +209,24 @@
 		font-weight: 600;
 		color: var(--fg);
 	}
+	/* The grid is clamped to first-session..today, so it's often far narrower
+	   than the full-width card. Rather than strand that space, lay the grid and
+	   its legend side by side on wide cards (legend fills the freed width) and
+	   let them stack when the card is too narrow to hold both. */
+	.plot-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 0.5rem 1.75rem;
+	}
 	.grid-scroll {
 		overflow-x: auto;
+		flex: 0 1 auto;
+	}
+	.plot-row .legend {
+		flex: 1 1 12rem;
+		margin-top: 0;
+		align-content: flex-start;
 	}
 	/* Natural size from the width/height attributes: cells stay 12px however
 	   short the span is — a stretched viewBox turns a two-week history into a
