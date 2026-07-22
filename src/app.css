@@ -20,6 +20,10 @@
 
 	--radius: 4px;
 	--shadow: 0 1px 0 rgba(27, 30, 27, 0.04), 0 1px 3px rgba(27, 30, 27, 0.08);
+	/* Elevated shadow for floating/lifted surfaces (nav dropdown, card hover) —
+	   distinct from --shadow's resting-card elevation. Both theme blocks below
+	   MUST stay identical — update together. */
+	--shadow-lg: 0 2px 4px rgba(27, 30, 27, 0.08), 0 10px 24px rgba(27, 30, 27, 0.08);
 
 	--font-display: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
 	--font-sans:
@@ -46,6 +50,7 @@
 		--danger-fg: #131614;
 
 		--shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.35);
+		--shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.4);
 
 		color-scheme: dark;
 	}
@@ -64,6 +69,7 @@
 	--danger-fg: #131614;
 
 	--shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.35);
+	--shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.4);
 
 	color-scheme: dark;
 }
@@ -399,6 +405,103 @@ button.small:disabled {
 	border: 1px solid var(--danger);
 	border-radius: 999px;
 	padding: 0.1rem 0.5rem;
+}
+
+/* Eyebrow idiom: <p class="kicker"><span class="dot"></span>Label</p> — a
+   small-caps label with a status dot, used above the main heading on every
+   auth page, settings, the wear log, and the landing hero. Modifiers change
+   only the dot: .solid is a permanently-lit dot (landing hero — there's no
+   on/off state to represent, just a "live" marker); .error rings it in
+   --danger (the error page's status code, always wrong, never toggled);
+   .on — or a focus-within container, for the auth forms where focusing the
+   form itself is the "on" trigger — lights the ring with the same glow. */
+.kicker {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	font-family: var(--font-display);
+	font-size: 0.78rem;
+	font-weight: 600;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: var(--fg-muted);
+	margin: 0;
+}
+
+.dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	border: 1.5px solid var(--fg-muted);
+}
+
+.dot.solid,
+.dot.on,
+.card:focus-within .dot,
+form:focus-within .dot {
+	border: none;
+	background: var(--accent);
+}
+
+.dot.on,
+.card:focus-within .dot,
+form:focus-within .dot {
+	box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.dot.error {
+	border-color: var(--danger);
+}
+
+/* Chart chrome: SVG axis lines/labels and legend/swatch markup shared by
+   every /stats and watch-detail chart. Keyed off .chart-palette — the same
+   hook that (in src/routes/stats/+page.svelte) declares the --series-N
+   custom properties consumed via slotVar() in
+   src/lib/components/charts/palette.ts — every chart's root element already
+   carries that class, whether or not it happens to render a multi-series
+   legend. Charts assume an SVG with .gridline/.baseline lines and
+   .ytick/.xtick labels, plus (where there's more than one series) either a
+   <ul class="legend"><li><span class="swatch"> or a bare .swatch. */
+.chart-palette .gridline {
+	stroke: var(--border);
+	stroke-width: 1;
+}
+
+.chart-palette .baseline {
+	stroke: var(--fg-muted);
+	stroke-width: 1;
+}
+
+.chart-palette .ytick,
+.chart-palette .xtick {
+	fill: var(--fg-muted);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+.chart-palette .legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem 1rem;
+	list-style: none;
+	margin: 0.5rem 0 0;
+	padding: 0;
+}
+
+.chart-palette .legend li {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.8rem;
+	color: var(--fg-muted);
+}
+
+.chart-palette .swatch {
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	display: inline-block;
 }
 
 /* Motion here is decorative (hover lifts, short fades, the lume-dot glow) —

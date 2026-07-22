@@ -100,9 +100,7 @@
 	.card:hover {
 		transform: translateY(-2px);
 		border-color: var(--accent);
-		box-shadow:
-			0 2px 4px rgba(0, 0, 0, 0.08),
-			0 10px 24px rgba(0, 0, 0, 0.08);
+		box-shadow: var(--shadow-lg);
 	}
 
 	.photo {

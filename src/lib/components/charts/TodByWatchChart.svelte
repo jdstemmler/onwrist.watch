@@ -115,13 +115,15 @@
 {/if}
 
 <style>
+	/* --series-N values, and axis/legend chrome (.gridline/.baseline/.ytick/
+	   .xtick/.legend/.swatch), come from app.css, keyed off .chart-palette. */
+
 	svg {
 		width: 100%;
 		height: auto;
 		display: block;
 	}
 
-	/* --series-N values come from the .chart-palette rule in the stats page */
 	.band {
 		stroke: var(--bg-raised); /* 1px surface gap between stacked fills */
 		stroke-width: 1;
@@ -129,46 +131,5 @@
 
 	.hit {
 		fill: transparent;
-	}
-
-	.gridline {
-		stroke: var(--border);
-		stroke-width: 1;
-	}
-
-	.baseline {
-		stroke: var(--fg-muted);
-		stroke-width: 1;
-	}
-
-	.ytick,
-	.xtick {
-		font-size: 11px;
-		fill: var(--fg-muted);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.legend {
-		list-style: none;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.35rem 1rem;
-		margin: 0.5rem 0 0;
-		padding: 0;
-		font-size: 0.82rem;
-		color: var(--fg-muted);
-	}
-
-	.legend li {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-	}
-
-	.swatch {
-		width: 10px;
-		height: 10px;
-		border-radius: 2px;
-		display: inline-block;
 	}
 </style>

@@ -53,7 +53,7 @@
 	<div class="rail">
 		<section class="wear card" class:stale={data.stale}>
 			{#if data.state.wearing}
-				<p class="kicker"><span class="dot on"></span>On wrist</p>
+				<p class="kicker tight"><span class="dot on"></span>On wrist</p>
 				<h1 class="watch-name">{data.state.wearing.label}</h1>
 				<p class="sub num">
 					since {fmtTime(data.state.wearing.since)} · {elapsed(data.state.wearing.since)}
@@ -69,7 +69,7 @@
 					{/if}
 				</div>
 			{:else}
-				<p class="kicker"><span class="dot"></span>No watch on</p>
+				<p class="kicker tight"><span class="dot"></span>No watch on</p>
 				<h1 class="watch-name quip">{data.quip}</h1>
 				{#if data.state.watches.length === 0}
 					<!-- The PWA opens straight onto this page, so a brand-new account
@@ -137,7 +137,7 @@
 					<span class="lbl">Note</span>
 					<textarea name="note" rows="2" placeholder="optional"></textarea>
 				</label>
-				<button type="submit" class="primary big">Add Session</button>
+				<button type="submit" class="primary">Add Session</button>
 			</form>
 		</details>
 		{/if}
@@ -166,29 +166,11 @@
 	.wear.stale {
 		border-color: var(--danger);
 	}
-	.kicker {
-		font-family: var(--font-display);
-		font-size: 0.72rem;
-		font-weight: 600;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
+	/* .kicker/.dot/.dot.on come from app.css; this card's kicker sits right
+	   above a large heading, so it keeps its own (slightly tighter) spacing. */
+	.kicker.tight {
 		margin: 0 0 0.4rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		gap: 0.45rem;
-	}
-	.dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		border: 1.5px solid var(--fg-muted);
-	}
-	.dot.on {
-		border: none;
-		background: var(--accent);
-		box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 65%, transparent);
 	}
 	.watch-name {
 		font-size: 1.5rem;

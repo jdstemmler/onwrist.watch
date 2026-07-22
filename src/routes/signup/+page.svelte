@@ -86,32 +86,7 @@
 		gap: 0.9rem;
 	}
 
-	.kicker {
-		font-family: var(--font-display);
-		font-size: 0.78rem;
-		font-weight: 600;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
-		margin: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-	}
-
-	.dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		border: 1.5px solid var(--fg-muted);
-	}
-
-	.card:focus-within .dot {
-		border: none;
-		background: var(--accent);
-		box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 65%, transparent);
-	}
+	/* .kicker/.dot (and the focus-within glow) come from app.css. */
 
 	input {
 		color: var(--fg);
