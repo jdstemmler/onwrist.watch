@@ -110,9 +110,9 @@
 		margin: 0;
 	}
 
+	/* color/size come from the global .success; the card's flex gap owns
+	   the spacing here */
 	.success {
-		color: var(--accent);
-		font-size: 0.85rem;
 		margin: 0;
 	}
 
