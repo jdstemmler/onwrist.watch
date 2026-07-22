@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { slotVar, slotTier } from './palette';
+	import { slotVar, stackOrder, OTHER_SLOT, OTHER_ID, OTHER_LABEL } from './palette';
 
 	type Cell = { dayKey: string; watchId: number; label: string; hours: number };
 
@@ -74,12 +74,21 @@
 		return out;
 	});
 
+	// A day whose dominant watch is outside the top 11 renders the neutral
+	// "Other" color (colorSlots maps it to OTHER_SLOT); the legend collapses all
+	// such days into one "Other" entry, stacked after the colored watches.
+	const pooled = (watchId: number) => colorSlots.get(watchId) === OTHER_SLOT;
+	const colorOf = (watchId: number) =>
+		slotVar(watchId === OTHER_ID ? OTHER_SLOT : (colorSlots.get(watchId) ?? 0));
+
 	const legend = $derived.by(() => {
 		const seen = new Map<number, string>();
-		for (const c of calendar) if (!seen.has(c.watchId)) seen.set(c.watchId, c.label);
-		return [...seen.entries()].sort((a, b) => a[0] - b[0]);
+		for (const c of calendar) {
+			const key = pooled(c.watchId) ? OTHER_ID : c.watchId;
+			if (!seen.has(key)) seen.set(key, pooled(c.watchId) ? OTHER_LABEL : c.label);
+		}
+		return [...seen.entries()].map(([watchId, label]) => ({ watchId, label })).sort(stackOrder);
 	});
-	const anyRepeat = $derived(legend.some(([id]) => slotTier(colorSlots.get(id) ?? 0) >= 1));
 
 	const CELL = 12;
 	const GAP = 2;
@@ -164,20 +173,13 @@
 		{/if}
 	{:else if legend.length > 0}
 		<ul class="legend">
-			{#each legend as [watchId, label] (watchId)}
+			{#each legend as { watchId, label } (watchId)}
 				<li>
-					<span
-						class="swatch"
-						class:repeat={slotTier(colorSlots.get(watchId) ?? 0) >= 1}
-						style="background: {slotVar(colorSlots.get(watchId) ?? 0)}"
-					></span>
+					<span class="swatch" style="background: {colorOf(watchId)}"></span>
 					{label}
 				</li>
 			{/each}
 			<li><span class="swatch empty-swatch"></span> No wear</li>
-			{#if anyRepeat}
-				<li class="legend-note">ringed = 2nd color cycle</li>
-			{/if}
 		</ul>
 	{/if}
 	</div>

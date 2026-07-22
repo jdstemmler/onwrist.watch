@@ -10,7 +10,9 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const colorSlots = $derived(assignSlots(data.byWatch.map((w) => w.watchId)));
+	// Membership derives from all-time wear hours: the top 11 watches hold the
+	// hues, the rest pool into the neutral "Other" series.
+	const colorSlots = $derived(assignSlots(data.byWatch));
 
 	function fmtHours(h: number) {
 		return (Math.round(h * 10) / 10).toLocaleString();
@@ -107,9 +109,11 @@
 	   references var(--series-N) (see slotVar() in
 	   $lib/components/charts/palette.ts); the values are declared once here
 	   instead of being copy-pasted into each component's local <style> block.
-	   Must stay in sync with CATEGORICAL in palette.ts (11 hues). Ranks past
-	   11 recycle these hues (slotVar wraps) and slotTier() flags the recycled
-	   ones with a ring in legends/chips. */
+	   Must stay in sync with CATEGORICAL in palette.ts (11 hues). --series-other
+	   is the neutral for the pooled "Other" series (watches outside the top 11):
+	   a desaturated gray-green, kept clearly distinct from the calendar's
+	   "No wear" gray (color-mix(border 60%)) and the card surface in both
+	   themes. */
 	:global(.chart-palette) {
 		--series-1: #2a78d6;
 		--series-2: #008300;
@@ -122,6 +126,7 @@
 		--series-9: #0f9a9a;
 		--series-10: #a24bbf;
 		--series-11: #7a9e00;
+		--series-other: #9aa39a;
 	}
 	@media (prefers-color-scheme: dark) {
 		:root:where(:not([data-theme='light'])) :global(.chart-palette) {
@@ -136,6 +141,7 @@
 			--series-9: #0f9a9a;
 			--series-10: #b05fce;
 			--series-11: #7d9a1a;
+			--series-other: #6b746a;
 		}
 	}
 	:root[data-theme='dark'] :global(.chart-palette) {
@@ -150,6 +156,7 @@
 		--series-9: #0f9a9a;
 		--series-10: #b05fce;
 		--series-11: #7d9a1a;
+		--series-other: #6b746a;
 	}
 
 	.tiles {

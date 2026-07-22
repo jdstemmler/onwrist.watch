@@ -1,23 +1,31 @@
 <script lang="ts">
-	import { slotVar, slotTier, niceTicks } from './palette';
+	import { slotVar, stackOrder, niceTicks, OTHER_SLOT, OTHER_ID, OTHER_LABEL } from './palette';
 
 	type Row = { hour: number; watchId: number; label: string; hours: number };
 
 	let { rows, colorSlots }: { rows: Row[]; colorSlots: Map<number, number> } = $props();
 
-	// stable stack + color order: ascending watch id, same as every other chart
+	// Watches outside the top 11 pool into one summed neutral "Other" series,
+	// stacked last; the top 11 keep their id-ordered stack + hue.
+	const pooled = (watchId: number) => colorSlots.get(watchId) === OTHER_SLOT;
+	const colorOf = (watchId: number) =>
+		slotVar(watchId === OTHER_ID ? OTHER_SLOT : (colorSlots.get(watchId) ?? 0));
+	const seriesId = (watchId: number) => (pooled(watchId) ? OTHER_ID : watchId);
+
 	const series = $derived.by(() => {
 		const seen = new Map<number, string>();
-		for (const r of rows) if (!seen.has(r.watchId)) seen.set(r.watchId, r.label);
-		return [...seen.entries()].sort((a, b) => a[0] - b[0]);
+		for (const r of rows) {
+			const key = seriesId(r.watchId);
+			if (!seen.has(key)) seen.set(key, pooled(r.watchId) ? OTHER_LABEL : r.label);
+		}
+		return [...seen.entries()].sort((a, b) => stackOrder({ watchId: a[0] }, { watchId: b[0] }));
 	});
-	const anyRepeat = $derived(series.some(([id]) => slotTier(colorSlots.get(id) ?? 0) >= 1));
 
-	// hours[watchId][hour] -> wrist-hours
+	// hours[seriesId][hour] -> wrist-hours (pooled watches summed under OTHER_ID)
 	const grid = $derived.by(() => {
 		const m = new Map<number, number[]>();
 		for (const [id] of series) m.set(id, Array(24).fill(0));
-		for (const r of rows) m.get(r.watchId)![r.hour] += r.hours;
+		for (const r of rows) m.get(seriesId(r.watchId))![r.hour] += r.hours;
 		return m;
 	});
 
@@ -91,7 +99,7 @@
 					<text x="-8" y={y(t)} class="ytick" text-anchor="end" dominant-baseline="middle">{t}</text>
 				{/each}
 				{#each bands as b (b.id)}
-					<path d={b.d} fill={slotVar(colorSlots.get(b.id) ?? 0)} class="band" />
+					<path d={b.d} fill={colorOf(b.id)} class="band" />
 				{/each}
 				{#each Array.from({ length: 24 }, (_, h) => h) as h}
 					<rect x={x(h)} y="0" width={CELL} height={PLOT_H} class="hit">
@@ -107,17 +115,10 @@
 		<ul class="legend">
 			{#each series as [id, label] (id)}
 				<li>
-					<span
-						class="swatch"
-						class:repeat={slotTier(colorSlots.get(id) ?? 0) >= 1}
-						style="background: {slotVar(colorSlots.get(id) ?? 0)}"
-					></span>
+					<span class="swatch" style="background: {colorOf(id)}"></span>
 					{label}
 				</li>
 			{/each}
-			{#if anyRepeat}
-				<li class="legend-note">ringed = 2nd color cycle</li>
-			{/if}
 		</ul>
 	</div>
 {/if}

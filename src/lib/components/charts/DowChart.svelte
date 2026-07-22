@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { slotVar, slotTier, niceTicks } from './palette';
+	import { slotVar, stackOrder, niceTicks, OTHER_SLOT, OTHER_ID, OTHER_LABEL } from './palette';
 
 	type Row = { dow: number; watchId: number; label: string; hours: number };
 
@@ -8,11 +8,25 @@
 	const DOW_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 	const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+	// Watches outside the top 11 (colorSlots === OTHER_SLOT) pool into one
+	// summed neutral "Other" band per day, stacked last.
+	const pooled = (watchId: number) => colorSlots.get(watchId) === OTHER_SLOT;
+	const colorOf = (watchId: number) =>
+		slotVar(watchId === OTHER_ID ? OTHER_SLOT : (colorSlots.get(watchId) ?? 0));
+
 	const byDow = $derived.by(() => {
-		const m: Row[][] = Array.from({ length: 7 }, () => []);
-		for (const r of rows) m[r.dow].push(r);
-		for (const arr of m) arr.sort((a, b) => a.watchId - b.watchId);
-		return m;
+		const m: Map<number, { watchId: number; label: string; hours: number }>[] = Array.from(
+			{ length: 7 },
+			() => new Map()
+		);
+		for (const r of rows) {
+			const key = pooled(r.watchId) ? OTHER_ID : r.watchId;
+			const bucket = m[r.dow];
+			const cur = bucket.get(key);
+			if (cur) cur.hours += r.hours;
+			else bucket.set(key, { watchId: key, label: pooled(r.watchId) ? OTHER_LABEL : r.label, hours: r.hours });
+		}
+		return m.map((bucket) => [...bucket.values()].sort(stackOrder));
 	});
 	const totals = $derived(byDow.map((day) => day.reduce((s, r) => s + r.hours, 0)));
 	const maxTotal = $derived(Math.max(0, ...totals));
@@ -24,9 +38,10 @@
 	const COL = PLOT_W / 7;
 	const BAR_W = 26;
 
-	type Seg = { watchId: number; label: string; hours: number; y: number; height: number };
+	type Stacked = { watchId: number; label: string; hours: number };
+	type Seg = Stacked & { y: number; height: number };
 
-	function segmentsFor(day: Row[]): Seg[] {
+	function segmentsFor(day: Stacked[]): Seg[] {
 		const n = day.length;
 		let cum = 0;
 		return day.map((seg, i) => {
@@ -42,10 +57,12 @@
 
 	const legend = $derived.by(() => {
 		const seen = new Map<number, string>();
-		for (const r of rows) if (!seen.has(r.watchId)) seen.set(r.watchId, r.label);
-		return [...seen.entries()].sort((a, b) => a[0] - b[0]);
+		for (const r of rows) {
+			const key = pooled(r.watchId) ? OTHER_ID : r.watchId;
+			if (!seen.has(key)) seen.set(key, pooled(r.watchId) ? OTHER_LABEL : r.label);
+		}
+		return [...seen.entries()].map(([watchId, label]) => ({ watchId, label })).sort(stackOrder);
 	});
-	const anyRepeat = $derived(legend.some(([id]) => slotTier(colorSlots.get(id) ?? 0) >= 1));
 
 	function fmtHours(h: number) {
 		return (Math.round(h * 10) / 10).toString();
@@ -71,7 +88,7 @@
 							width={BAR_W}
 							height={seg.height}
 							rx="2"
-							fill={slotVar(colorSlots.get(seg.watchId) ?? 0)}
+							fill={colorOf(seg.watchId)}
 						>
 							<title>{DOW_NAMES[i]} · {seg.label} · {fmtHours(seg.hours)}h</title>
 						</rect>
@@ -83,19 +100,12 @@
 	</svg>
 	{#if legend.length > 1}
 		<ul class="legend">
-			{#each legend as [watchId, label] (watchId)}
+			{#each legend as { watchId, label } (watchId)}
 				<li>
-					<span
-						class="swatch"
-						class:repeat={slotTier(colorSlots.get(watchId) ?? 0) >= 1}
-						style="background: {slotVar(colorSlots.get(watchId) ?? 0)}"
-					></span>
+					<span class="swatch" style="background: {colorOf(watchId)}"></span>
 					{label}
 				</li>
 			{/each}
-			{#if anyRepeat}
-				<li class="legend-note">ringed = 2nd color cycle</li>
-			{/if}
 		</ul>
 	{/if}
 </div>

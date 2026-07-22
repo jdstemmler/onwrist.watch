@@ -6,12 +6,14 @@
 //   dark:  all slots >= 3.3:1
 //
 // Order is the CVD-safety mechanism (adjacent slots keep a worst-case
-// normal-vision ΔE of ~19.3 and CVD-sim ΔE of ~8.2) — never re-cycle or
-// reorder per-chart. The array cycles at the 20-watch quota, so the
-// last→first wrap pair (slot 11 -> slot 1) is held to the same bar as every
-// interior adjacency. Slots 9-11 are the only open hue positions left:
-// teal↔aqua and purple↔violet are near-twins, so they're never placed
-// adjacent and are told apart by the legend.
+// normal-vision ΔE of ~19.3 and CVD-sim ΔE of ~8.2) — never reorder per-chart.
+//
+// Hues never recycle. A collection has at most 11 colored watches: the top 11
+// by all-time wear hours (`assignSlots`) hold the hues and every remaining
+// watch pools into a single neutral "Other" series (`OTHER_SLOT` →
+// `var(--series-other)`), so a hue always means one specific watch and color
+// consistently reads as "core rotation". Collections of 11 or fewer watches
+// colour exactly as before (all watches are core, id-ordered).
 export type ColorSlot = { light: string; dark: string };
 
 export const CATEGORICAL: ColorSlot[] = [
@@ -28,41 +30,72 @@ export const CATEGORICAL: ColorSlot[] = [
 	{ light: '#7a9e00', dark: '#7d9a1a' } // 11 chartreuse
 ];
 
+/** Number of colored hue slots; the top this-many watches by wear hold them. */
+export const MAX_HUES = CATEGORICAL.length;
+
+/** Slot sentinel for the pooled "Other" series — maps to the neutral
+ * `var(--series-other)` rather than a categorical hue. */
+export const OTHER_SLOT = -1;
+
+/** Synthetic series/watch id for the merged "Other" band in the stacked
+ * charts (day-of-week, watch-by-time-of-day). Distinct from every real watch
+ * id (which are positive) so pooled watches sum into one band. */
+export const OTHER_ID = -1;
+
+/** Legend/label text for the pooled series. */
+export const OTHER_LABEL = 'Other';
+
 /**
- * Stable watchId -> palette rank, assigned by ascending watch id so a given
- * watch always lands on the same rank no matter which chart's own sort order
- * (hours desc, lastWornAt asc, dayKey, ...) is calling this. Pass the full
- * watch-id universe (e.g. every id in `byWatch`), not just the ids visible in
- * one chart's slice, so a watch's color never shifts when a filter changes
- * which chart happens to render it.
+ * Maps every watch to a color slot from its all-time wear hours. The top
+ * {@link MAX_HUES} watches by hours (tiebreak: watch id ascending) are the
+ * "core" rotation and hold the hues; every other watch maps to
+ * {@link OTHER_SLOT}. Among the core, the hue *slot* is assigned by ascending
+ * watch id — never by wear rank — so a watch keeps the same hue as long as it
+ * stays in the core, and collections of ≤ MAX_HUES watches colour exactly as
+ * an id-ordered scale (all core, no Other).
  *
- * The value is the stable 0-based rank, uncapped — `slotVar()` maps it to a
- * hue (wrapping past the last slot) and `slotTier()` reports which cycle it
- * lands in, so a legend can flag the second cycle's recycled hues.
+ * Membership derives only from the hours passed in, so it's stable across a
+ * chart's own sort order and across view filters (e.g. the calendar's year):
+ * pass the full watch universe with its all-time hours and a watch's color
+ * never shifts when a filter changes which rows a chart renders.
  */
-export function assignSlots(watchIds: Iterable<number>): Map<number, number> {
-	const ids = [...new Set(watchIds)].sort((a, b) => a - b);
-	return new Map(ids.map((id, i) => [id, i]));
+export function assignSlots(watches: Iterable<{ watchId: number; hours: number }>): Map<number, number> {
+	const all = [...watches];
+	const core = [...all]
+		.sort((a, b) => b.hours - a.hours || a.watchId - b.watchId)
+		.slice(0, MAX_HUES)
+		.map((w) => w.watchId);
+	const coreSet = new Set(core);
+	const slots = new Map<number, number>();
+	// Hue slot is id-ordered among the core, independent of wear rank.
+	core
+		.slice()
+		.sort((a, b) => a - b)
+		.forEach((id, i) => slots.set(id, i));
+	for (const wa of all) if (!coreSet.has(wa.watchId)) slots.set(wa.watchId, OTHER_SLOT);
+	return slots;
 }
 
-/** CSS custom-property name for a slot, e.g. `var(--series-3)`. The matching
- * `--series-N` values (light + dark, kept in sync with CATEGORICAL above) are
- * declared exactly once, in a `:global(.chart-palette)` rule in
+/** CSS custom-property name for a slot, e.g. `var(--series-3)`; the pooled
+ * `OTHER_SLOT` resolves to the neutral `var(--series-other)`. The matching
+ * values (light + dark, kept in sync with CATEGORICAL above) are declared
+ * exactly once, in a `:global(.chart-palette)` rule in
  * `src/routes/stats/+page.svelte` — every chart component's root element
- * carries class="chart-palette" and only ever references `var(--series-N)`,
- * never redeclaring the values itself. (Svelte `<style>` blocks are static
- * CSS text, so this constant can't be interpolated into them — the page's
+ * carries class="chart-palette" and only ever references these vars, never
+ * redeclaring the values itself. (Svelte `<style>` blocks are static CSS
+ * text, so this constant can't be interpolated into them — the page's
  * `<style>` block is the single source of truth instead.) */
 export function slotVar(slot: number): string {
-	return `var(--series-${(slot % CATEGORICAL.length) + 1})`;
+	return slot === OTHER_SLOT ? 'var(--series-other)' : `var(--series-${slot + 1})`;
 }
 
-/** Which color cycle a rank lands in: 0 for the first pass through the 11
- * hues, 1 once ranks wrap and start recycling colors (only tier 1 occurs at
- * the 20-watch quota). Legends/chips ring the tier->=1 swatches so a recycled
- * hue is told apart from its first-cycle twin. */
-export function slotTier(index: number): number {
-	return Math.floor(index / CATEGORICAL.length);
+/** Stack/legend order comparator for the stacked band charts: real watches by
+ * ascending id, with the pooled "Other" series ({@link OTHER_ID}) always last
+ * (top of a stack, end of a legend). */
+export function stackOrder(a: { watchId: number }, b: { watchId: number }): number {
+	if (a.watchId === OTHER_ID) return 1;
+	if (b.watchId === OTHER_ID) return -1;
+	return a.watchId - b.watchId;
 }
 
 /** Rounds `max` up to a "nice" axis ceiling (1/2/5 × 10^n) and returns evenly
