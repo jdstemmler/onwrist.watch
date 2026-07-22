@@ -1,5 +1,8 @@
 <script lang="ts">
-	let { appName }: { appName: string } = $props();
+	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+
+	let { appName, demoAvailable }: { appName: string; demoAvailable: boolean } = $props();
 	const REPO = 'https://github.com/jdstemmler/onwrist.watch';
 </script>
 
@@ -14,7 +17,15 @@
 		<div class="actions">
 			<a class="button primary" href="/signup">Create account</a>
 			<a class="button ghost" href="/login">Sign in</a>
+			{#if demoAvailable}
+				<form method="POST" action="/?/demo" use:enhance>
+					<button type="submit" class="button ghost">Try the demo</button>
+				</form>
+			{/if}
 		</div>
+		{#if page.form?.message}
+			<p class="demo-error" role="alert">{page.form.message}</p>
+		{/if}
 	</div>
 
 	<figure class="shot" aria-hidden="true">
@@ -115,6 +126,15 @@
 	.actions .button {
 		padding: 0.65rem 1.4rem;
 		font-size: 0.95rem;
+	}
+	.actions form {
+		display: contents;
+	}
+
+	.demo-error {
+		margin: 0.5rem 0 0;
+		font-size: 0.85rem;
+		color: var(--danger);
 	}
 	/* balanced pair: solid primary + outlined secondary (same footprint) */
 	.button.ghost {
