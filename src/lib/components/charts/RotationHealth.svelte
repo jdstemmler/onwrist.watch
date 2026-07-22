@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { slotVar } from './palette';
+	import { slotVar, slotTier } from './palette';
 
 	type WatchStats = {
 		watchId: number;
@@ -49,7 +49,11 @@
 			<ul class="neglect-list">
 				{#each neglect as w (w.watchId)}
 					<li>
-						<span class="swatch" style="background: {slotVar(colorSlots.get(w.watchId) ?? 0)}"></span>
+						<span
+							class="swatch"
+							class:repeat={slotTier(colorSlots.get(w.watchId) ?? 0) >= 1}
+							style="background: {slotVar(colorSlots.get(w.watchId) ?? 0)}"
+						></span>
 						<a class="name" href="/watches/{w.watchId}">{w.label}</a>
 						<span class="days num">
 							{#if w.daysSince === null}
@@ -84,7 +88,11 @@
 					{#each costLeaderboard as w (w.watchId)}
 						<tr>
 							<td>
-								<span class="swatch" style="background: {slotVar(colorSlots.get(w.watchId) ?? 0)}"></span>
+								<span
+									class="swatch"
+									class:repeat={slotTier(colorSlots.get(w.watchId) ?? 0) >= 1}
+									style="background: {slotVar(colorSlots.get(w.watchId) ?? 0)}"
+								></span>
 								<a class="name" href="/watches/{w.watchId}">{w.label}</a>
 							</td>
 							<td class="num">{fmtCents(w.costPerWearCents ?? 0)}</td>
@@ -162,6 +170,15 @@
 	td.num {
 		text-align: right;
 		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	/* Let the Watch column absorb the table's slack so the two numeric columns
+	   ($ / wear, Days worn) sit flush-right together and read as one
+	   right-aligned block — matching the neglect list above — instead of the
+	   currency column's values floating in the middle of a stretched column. */
+	th:first-child,
+	td:first-child {
+		width: 100%;
 	}
 	td:first-child {
 		display: flex;

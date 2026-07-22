@@ -107,7 +107,9 @@
 	   references var(--series-N) (see slotVar() in
 	   $lib/components/charts/palette.ts); the values are declared once here
 	   instead of being copy-pasted into each component's local <style> block.
-	   Must stay in sync with CATEGORICAL in palette.ts. */
+	   Must stay in sync with CATEGORICAL in palette.ts (11 hues). Ranks past
+	   11 recycle these hues (slotVar wraps) and slotTier() flags the recycled
+	   ones with a ring in legends/chips. */
 	:global(.chart-palette) {
 		--series-1: #2a78d6;
 		--series-2: #008300;
@@ -117,6 +119,9 @@
 		--series-6: #eb6834;
 		--series-7: #4a3aa7;
 		--series-8: #e34948;
+		--series-9: #0f9a9a;
+		--series-10: #a24bbf;
+		--series-11: #7a9e00;
 	}
 	@media (prefers-color-scheme: dark) {
 		:root:where(:not([data-theme='light'])) :global(.chart-palette) {
@@ -128,6 +133,9 @@
 			--series-6: #d95926;
 			--series-7: #9085e9;
 			--series-8: #e66767;
+			--series-9: #0f9a9a;
+			--series-10: #b05fce;
+			--series-11: #7d9a1a;
 		}
 	}
 	:root[data-theme='dark'] :global(.chart-palette) {
@@ -139,6 +147,9 @@
 		--series-6: #d95926;
 		--series-7: #9085e9;
 		--series-8: #e66767;
+		--series-9: #0f9a9a;
+		--series-10: #b05fce;
+		--series-11: #7d9a1a;
 	}
 
 	.tiles {

@@ -79,6 +79,15 @@
 	.tick:first-child {
 		transform: none;
 	}
+	/* On a phone the plot column is too narrow for all 5 axis labels — they
+	   smear into "0h100h200h..." Drop the interior labels there and keep only
+	   the 0h/max endpoints; the per-bar gridlines still mark every tick, and
+	   each bar carries its own "389h · 28×" value, so no scale is lost. */
+	@media (max-width: 30rem) {
+		.tick:not(:first-child):not(:last-child) {
+			display: none;
+		}
+	}
 	.rows {
 		grid-column: 1 / -1;
 		display: grid;

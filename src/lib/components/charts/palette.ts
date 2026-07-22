@@ -1,12 +1,17 @@
-// Shared categorical color scale for the stats charts: an 8-hue palette
+// Shared categorical color scale for the stats charts: an 11-hue palette
 // tuned per theme, WCAG-contrast-checked against the card surfaces
 // (light #f7f8f4, dark #1b1f1c):
-//   light: slots 3/4/5 land at 2.0-2.6:1 — mitigated by always pairing a
+//   light: slots 3/4/5/11 land at 2.0-2.9:1 — mitigated by always pairing a
 //   colored mark with a text label/legend, never color alone
 //   dark:  all slots >= 3.3:1
 //
 // Order is the CVD-safety mechanism (adjacent slots keep a worst-case
-// normal-vision ΔE of ~19.5) — never re-cycle or reorder per-chart.
+// normal-vision ΔE of ~19.3 and CVD-sim ΔE of ~8.2) — never re-cycle or
+// reorder per-chart. The array cycles at the 20-watch quota, so the
+// last→first wrap pair (slot 11 -> slot 1) is held to the same bar as every
+// interior adjacency. Slots 9-11 are the only open hue positions left:
+// teal↔aqua and purple↔violet are near-twins, so they're never placed
+// adjacent and are told apart by the legend.
 export type ColorSlot = { light: string; dark: string };
 
 export const CATEGORICAL: ColorSlot[] = [
@@ -17,20 +22,27 @@ export const CATEGORICAL: ColorSlot[] = [
 	{ light: '#1baf7a', dark: '#199e70' }, // 5 aqua
 	{ light: '#eb6834', dark: '#d95926' }, // 6 orange
 	{ light: '#4a3aa7', dark: '#9085e9' }, // 7 violet
-	{ light: '#e34948', dark: '#e66767' } // 8 red
+	{ light: '#e34948', dark: '#e66767' }, // 8 red
+	{ light: '#0f9a9a', dark: '#0f9a9a' }, // 9 teal
+	{ light: '#a24bbf', dark: '#b05fce' }, // 10 purple
+	{ light: '#7a9e00', dark: '#7d9a1a' } // 11 chartreuse
 ];
 
 /**
- * Stable watchId -> palette slot, assigned by ascending watch id so a given
- * watch always lands on the same slot no matter which chart's own sort order
+ * Stable watchId -> palette rank, assigned by ascending watch id so a given
+ * watch always lands on the same rank no matter which chart's own sort order
  * (hours desc, lastWornAt asc, dayKey, ...) is calling this. Pass the full
  * watch-id universe (e.g. every id in `byWatch`), not just the ids visible in
  * one chart's slice, so a watch's color never shifts when a filter changes
  * which chart happens to render it.
+ *
+ * The value is the stable 0-based rank, uncapped — `slotVar()` maps it to a
+ * hue (wrapping past the last slot) and `slotTier()` reports which cycle it
+ * lands in, so a legend can flag the second cycle's recycled hues.
  */
 export function assignSlots(watchIds: Iterable<number>): Map<number, number> {
 	const ids = [...new Set(watchIds)].sort((a, b) => a - b);
-	return new Map(ids.map((id, i) => [id, i % CATEGORICAL.length]));
+	return new Map(ids.map((id, i) => [id, i]));
 }
 
 /** CSS custom-property name for a slot, e.g. `var(--series-3)`. The matching
@@ -43,6 +55,14 @@ export function assignSlots(watchIds: Iterable<number>): Map<number, number> {
  * `<style>` block is the single source of truth instead.) */
 export function slotVar(slot: number): string {
 	return `var(--series-${(slot % CATEGORICAL.length) + 1})`;
+}
+
+/** Which color cycle a rank lands in: 0 for the first pass through the 11
+ * hues, 1 once ranks wrap and start recycling colors (only tier 1 occurs at
+ * the 20-watch quota). Legends/chips ring the tier->=1 swatches so a recycled
+ * hue is told apart from its first-cycle twin. */
+export function slotTier(index: number): number {
+	return Math.floor(index / CATEGORICAL.length);
 }
 
 /** Rounds `max` up to a "nice" axis ceiling (1/2/5 × 10^n) and returns evenly
