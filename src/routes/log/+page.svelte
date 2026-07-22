@@ -46,7 +46,7 @@
 </svelte:head>
 
 {#if form?.message}
-	<p class="toast" role="alert">{form.message}</p>
+	<p class="error-banner" role="alert">{form.message}</p>
 {/if}
 
 <div class="page">
@@ -208,14 +208,6 @@
 	.nudge {
 		margin: 0.6rem 0 0;
 		color: var(--danger);
-		font-weight: 600;
-	}
-	.toast {
-		background: var(--danger);
-		color: var(--danger-fg);
-		border-radius: var(--radius);
-		padding: 0.75rem 1rem;
-		margin: 0 0 1rem;
 		font-weight: 600;
 	}
 	.actions {

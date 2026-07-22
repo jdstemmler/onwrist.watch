@@ -59,7 +59,7 @@
 							{/if}
 						</span>
 						{#if w.daysSince === null || w.daysSince >= NEGLECT_DAYS}
-							<span class="badge">neglected</span>
+							<span class="badge outline">neglected</span>
 						{/if}
 					</li>
 				{/each}
@@ -147,16 +147,6 @@
 	.days {
 		color: var(--fg-muted);
 		font-size: 0.85rem;
-	}
-	.badge {
-		font-size: 0.7rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
-		color: var(--danger);
-		border: 1px solid var(--danger);
-		border-radius: 999px;
-		padding: 0.1rem 0.5rem;
 	}
 	table {
 		width: 100%;

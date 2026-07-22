@@ -105,7 +105,7 @@
 			<h1>
 				{data.stats.label}
 				{#if data.watch.status === 'sold'}
-					<span class="pill">Sold</span>
+					<span class="badge fill">Sold</span>
 				{/if}
 			</h1>
 			{#if data.watch.nickname}
@@ -119,7 +119,7 @@
 	</header>
 
 	{#if form?.message}
-		<p class="toast" role="alert">{form.message}</p>
+		<p class="error-banner" role="alert">{form.message}</p>
 	{/if}
 
 	<form method="POST" action="?/addPhoto" enctype="multipart/form-data" use:enhance={submitPhoto}>
@@ -398,19 +398,6 @@
 		margin: 0;
 	}
 
-	.pill {
-		font-family: var(--font-sans);
-		font-size: 0.6rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--danger-fg);
-		background: var(--danger);
-		border-radius: 999px;
-		padding: 0.2em 0.6em;
-		vertical-align: middle;
-	}
-
 	.button {
 		display: inline-block;
 		background: var(--bg-raised);
@@ -621,13 +608,9 @@
 		display: none;
 	}
 
-	.toast {
-		background: var(--danger);
-		color: var(--danger-fg);
-		border-radius: var(--radius);
-		padding: 0.75rem 1rem;
+	/* the page stacks with flex gap; strip the banner's default p margin */
+	.error-banner {
 		margin: 0;
-		font-weight: 600;
 	}
 
 	.confirm {

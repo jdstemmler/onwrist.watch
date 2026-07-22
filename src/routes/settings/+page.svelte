@@ -23,7 +23,7 @@
 		<div class="verify-row">
 			<p class="warn">Not verified yet — some actions are locked until you confirm your email.</p>
 			{#if resultFor('resendVerify')?.sent}
-				<span class="ok">Sent — check your inbox.</span>
+				<span class="success">Sent — check your inbox.</span>
 			{:else}
 				<form method="POST" action="/settings?/resendVerify" use:enhance>
 					{#if resultFor('resendVerify')?.message}
@@ -58,7 +58,7 @@
 	<legend>Email</legend>
 	<form method="POST" action="?/email" use:enhance class="fields">
 		{#if resultFor('email')?.sent}
-			<p class="ok wide">Check the new address — we sent a confirmation link.</p>
+			<p class="success wide">Check the new address — we sent a confirmation link.</p>
 		{/if}
 		{#if resultFor('email')?.message}
 			<p class="error wide" role="alert">{resultFor('email')?.message}</p>
@@ -79,7 +79,7 @@
 	<legend>Preferences</legend>
 	<form method="POST" action="?/prefs" use:enhance class="fields">
 		{#if resultFor('prefs')?.saved}
-			<p class="ok wide">Saved.</p>
+			<p class="success wide">Saved.</p>
 		{/if}
 		{#if resultFor('prefs')?.message}
 			<p class="error wide" role="alert">{resultFor('prefs')?.message}</p>
@@ -188,49 +188,10 @@
 		margin: 0 0 0.5rem;
 	}
 
-	.ok {
-		color: var(--accent);
-		font-size: 0.85rem;
-	}
-
+	/* fieldset/legend/.fields come from app.css; this page stacks its
+	   sections with a margin rather than a form gap */
 	fieldset {
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		background: var(--bg-raised);
-		box-shadow: var(--shadow);
-		padding: 1.1rem 1.1rem 1.2rem;
-		margin: 0 0 1.25rem;
-	}
-
-	legend {
-		float: left;
-		width: 100%;
-		font-family: var(--font-display);
-		font-weight: 600;
-		font-size: 0.9rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
-		padding: 0 0 0.5rem;
-		margin: 0 0 1rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	fieldset::after {
-		content: '';
-		display: block;
-		clear: both;
-	}
-
-	.fields {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-		gap: 1rem 1.25rem;
-		clear: both;
-	}
-
-	.wide {
-		grid-column: 1 / -1;
+		margin-bottom: 1.25rem;
 	}
 
 	.actions {

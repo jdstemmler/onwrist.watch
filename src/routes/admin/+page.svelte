@@ -35,7 +35,7 @@
 </header>
 
 {#if form?.message}
-	<p class="error" role="alert">{form.message}</p>
+	<p class="error-banner" role="alert">{form.message}</p>
 {/if}
 
 <div class="table-wrap">
@@ -133,14 +133,6 @@
 		margin-bottom: 1rem;
 	}
 
-	.error {
-		color: var(--danger);
-		border: 1px solid var(--danger);
-		border-radius: var(--radius);
-		padding: 0.5rem 0.75rem;
-		background: color-mix(in srgb, var(--danger) 7%, transparent);
-	}
-
 	.table-wrap {
 		overflow-x: auto;
 		border: 1px solid var(--border);
@@ -207,15 +199,5 @@
 		display: flex;
 		gap: 0.4rem;
 		flex-wrap: wrap;
-	}
-
-	button.small {
-		font-size: 0.76rem;
-		padding: 0.28rem 0.55rem;
-	}
-
-	button.small:disabled {
-		opacity: 0.4;
-		cursor: default;
 	}
 </style>

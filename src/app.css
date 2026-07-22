@@ -213,6 +213,51 @@ label.field :is(input, select, textarea) {
 	color: var(--accent);
 }
 
+/* Form sections: <fieldset><legend>…</legend><div class="fields">…</div></fieldset>
+   renders as a card with an uppercase caption. The floated legend pulls the
+   caption out of the fieldset border, killing the default notched look; the
+   ::after clearfix contains it. Grid children spanning the full row take
+   class="wide". */
+fieldset {
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--bg-raised);
+	box-shadow: var(--shadow);
+	padding: 1.1rem 1.1rem 1.2rem;
+	margin: 0;
+}
+
+legend {
+	float: left;
+	width: 100%;
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: 0.9rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--fg-muted);
+	padding: 0 0 0.5rem;
+	margin: 0 0 1rem;
+	border-bottom: 1px solid var(--border);
+}
+
+fieldset::after {
+	content: '';
+	display: block;
+	clear: both;
+}
+
+.fields {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+	gap: 1rem 1.25rem;
+	clear: both;
+}
+
+.fields > .wide {
+	grid-column: 1 / -1;
+}
+
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
@@ -264,12 +309,96 @@ button.danger,
 	background: transparent;
 }
 
+button.small,
+.button.small {
+	font-size: 0.78rem;
+	padding: 0.3rem 0.5rem;
+}
+
+button.small:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
 .card {
 	background: var(--bg-raised);
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
 	box-shadow: var(--shadow);
 	padding: 1rem;
+}
+
+/* Action feedback: .error-banner is the one treatment for a failed form
+   action (danger is for warnings — tinted, never a solid fill); .success is
+   the quiet confirmation line. */
+.error-banner {
+	color: var(--danger);
+	border: 1px solid var(--danger);
+	border-radius: var(--radius);
+	padding: 0.5rem 0.75rem;
+	background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+
+.success {
+	color: var(--accent);
+	font-size: 0.85rem;
+}
+
+/* Full-width notice strip under the nav. Variants pick the tint via
+   --banner-tint (and optionally --banner-tint-amount). */
+.top-banner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 0.6rem;
+	padding: 0.5rem 1rem;
+	background: color-mix(
+		in srgb,
+		var(--banner-tint, var(--accent)) var(--banner-tint-amount, 12%),
+		var(--bg-raised)
+	);
+	border-bottom: 1px solid var(--border);
+	font-size: 0.82rem;
+	text-align: center;
+}
+
+.top-banner p {
+	margin: 0;
+	color: var(--fg);
+}
+
+/* Badge family: tiny uppercase status markers. Base is plain accent text;
+   .fill is a solid danger pill; .outline a bordered danger pill. Variant
+   scales were promoted verbatim from their call sites, so they differ
+   slightly on purpose. */
+.badge {
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--accent);
+}
+
+.badge.fill {
+	font-family: var(--font-sans);
+	font-size: 0.6rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	color: var(--danger-fg);
+	background: var(--danger);
+	border-radius: 999px;
+	padding: 0.2em 0.6em;
+	vertical-align: middle;
+}
+
+.badge.outline {
+	font-size: 0.7rem;
+	letter-spacing: 0.03em;
+	color: var(--danger);
+	border: 1px solid var(--danger);
+	border-radius: 999px;
+	padding: 0.1rem 0.5rem;
 }
 
 /* Motion here is decorative (hover lifts, short fades, the lume-dot glow) —

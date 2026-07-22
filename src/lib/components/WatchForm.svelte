@@ -26,7 +26,7 @@
 </header>
 
 {#if message}
-	<p class="error" role="alert">{message}</p>
+	<p class="error-banner" role="alert">{message}</p>
 {/if}
 
 <form
@@ -198,67 +198,18 @@
 		font-size: 0.85rem;
 	}
 
-	.error {
-		color: var(--danger);
-		border: 1px solid var(--danger);
-		border-radius: var(--radius);
-		padding: 0.5rem 0.75rem;
-		background: color-mix(in srgb, var(--danger) 7%, transparent);
-	}
-
 	form {
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;
 	}
 
-	fieldset {
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		background: var(--bg-raised);
-		box-shadow: var(--shadow);
-		padding: 1.1rem 1.1rem 1.2rem;
-		margin: 0;
-	}
-
-	/* float pulls the legend out of the fieldset border, killing the
-	   default notched look; it renders as a section header inside the card */
-	legend {
-		float: left;
-		width: 100%;
-		font-family: var(--font-display);
-		font-weight: 600;
-		font-size: 0.9rem;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
-		padding: 0 0 0.5rem;
-		margin: 0 0 1rem;
-		border-bottom: 1px solid var(--border);
-	}
-
-	fieldset::after {
-		content: '';
-		display: block;
-		clear: both;
-	}
-
-	/* direct children of the Photos fieldset sit outside a .fields grid;
-	   they must clear the floated legend too */
+	/* fieldset/legend/.fields come from app.css; direct children of the
+	   Photos fieldset sit outside a .fields grid and must clear the
+	   floated legend too */
 	fieldset > label,
 	.photos {
 		clear: both;
-	}
-
-	.fields {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-		gap: 1rem 1.25rem;
-		clear: both;
-	}
-
-	label.wide {
-		grid-column: 1 / -1;
 	}
 
 	.check {
@@ -311,19 +262,10 @@
 		border-radius: calc(var(--radius) - 3px);
 	}
 
+	/* type/color come from the global .badge; center it in the photo card */
 	.badge {
-		font-size: 0.72rem;
-		font-weight: 600;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		color: var(--accent);
 		text-align: center;
 		padding: 0.3rem 0;
-	}
-
-	button.small {
-		font-size: 0.78rem;
-		padding: 0.3rem 0.5rem;
 	}
 
 	.actions {
