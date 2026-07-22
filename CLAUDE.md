@@ -58,6 +58,26 @@ a pointer at the deployed commit.
 - Admin (`/admin`) is an ops-only console, not a tenant feature: role-gated with a 404 (never 403) for non-admins so the surface's existence isn't disclosed to a signed-in member poking at the URL (`gate()` in `src/routes/admin/+page.server.ts`). Cross-tenant admin operations (list all users, disable/enable, delete, resend verification, quota) live in `src/lib/server/admin.ts`, never inline in route code. The admin account is seeded at boot from `ADMIN_EMAIL` (`ensureAdmin()`, called from `getDb()`) with an unusable random password hash — no separate invite flow; the operator sets a real password via the ordinary forgot-password/reset flow.
 - TDD for domain/stats/auth; UI is lightly tested and verified in the browser. Apply the frontend-design skill for UI work and the dataviz skill for charts.
 
+## Working issues (including cloud/sandboxed sessions)
+
+Fix and polish work is tracked as GitHub issues (`polish` label for
+design/UX items). Issues are written to be self-contained: file:line
+refs, a proposed fix, screenshots where visual, acceptance criteria.
+Work one issue per branch/PR and put `Closes #NN` in the PR body.
+
+- **No Docker available** (Claude Code cloud/web, CI-like sandboxes):
+  `npm test` (PGlite, in-process — needs no external database or env
+  vars) plus `npm run check` are the complete verification gates. Do
+  not attempt the docker scratch stack there.
+- The dev server (`npm run dev`) needs a real Postgres via
+  `DATABASE_URL`; it is optional for most fixes. If a change is visual
+  and the session has no browser to verify with, say so in the PR
+  ("visual verification deferred to operator") rather than skipping
+  silently — screenshots in the PR are welcome when possible.
+- Node 22 (matches CI). Setup is `npm ci`; nothing else.
+- No issue requires production access or secrets of any kind. If work
+  seems to need them, stop and flag it in the issue instead.
+
 ## Public-repo hygiene
 
 This repo is public — files, commit messages, PR descriptions, and issues
