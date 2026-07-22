@@ -17,6 +17,7 @@ export type SessionUser = {
 	homeTz: string;
 	staleSessionHours: number;
 	verified: boolean;
+	isDemo: boolean;
 };
 
 /** Creates a session row and returns the (unhashed) cookie token. Member
@@ -69,7 +70,8 @@ export async function validateSession(
 		role: u.role,
 		homeTz: u.homeTz,
 		staleSessionHours: u.staleSessionHours,
-		verified: u.emailVerifiedAt !== null
+		verified: u.emailVerifiedAt !== null,
+		isDemo: u.isDemo
 	};
 }
 

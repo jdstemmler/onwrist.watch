@@ -11,6 +11,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		appName: config.appName,
 		email: locals.user?.email ?? null,
 		verified: locals.user?.verified ?? true,
-		role: locals.user?.role ?? null
+		role: locals.user?.role ?? null,
+		demo: locals.user?.isDemo ?? false
 	};
 };

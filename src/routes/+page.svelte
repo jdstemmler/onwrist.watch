@@ -11,7 +11,7 @@
 </svelte:head>
 
 {#if data.landing}
-	<LandingHero appName={data.appName} />
+	<LandingHero appName={data.appName} demoAvailable={data.demoAvailable} />
 {:else}
 	<header class="row">
 		<h1>Collection</h1>

@@ -84,6 +84,18 @@ describe('sessions', () => {
 		expect(await validateSession(db, token, T0)).toBeNull();
 	});
 
+	it('exposes isDemo on the session user', async () => {
+		const [demo] = await db
+			.insert(users)
+			.values({ email: 'demo@x.test', passwordHash: 'x', isDemo: true })
+			.returning();
+		const token = await createSession(db, demo.id, T0);
+		expect((await validateSession(db, token, T0))?.isDemo).toBe(true);
+
+		const memberToken = await createSession(db, uid, T0);
+		expect((await validateSession(db, memberToken, T0))?.isDemo).toBe(false);
+	});
+
 	it('revoke logs the token out immediately', async () => {
 		const token = await createSession(db, uid, T0);
 		await revokeSession(db, token);
@@ -116,7 +128,8 @@ describe('shouldSlideCookie', () => {
 		role: 'member',
 		homeTz: 'America/Los_Angeles',
 		staleSessionHours: 24,
-		verified: true
+		verified: true,
+		isDemo: false
 	};
 	const admin: SessionUser = { ...member, role: 'admin' };
 

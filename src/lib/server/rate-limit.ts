@@ -11,7 +11,8 @@ export const LIMITS = {
 	resendVerify: { max: 3, windowMs: 3_600_000 },
 	emailChange: { max: 3, windowMs: 86_400_000 },
 	passwordChange: { max: 5, windowMs: 3_600_000 },
-	accountDelete: { max: 5, windowMs: 3_600_000 }
+	accountDelete: { max: 5, windowMs: 3_600_000 },
+	demoIp: { max: 10, windowMs: 900_000 }
 } as const;
 export type LimitName = keyof typeof LIMITS;
 

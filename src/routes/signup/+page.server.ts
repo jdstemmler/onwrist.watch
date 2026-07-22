@@ -7,7 +7,7 @@ import { verifyTurnstile } from '$lib/server/turnstile';
 import { signup } from '$lib/server/flows';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (locals.user) redirect(303, '/log');
+	if (locals.user && !locals.user.isDemo) redirect(303, '/log');
 	return { turnstileSiteKey: config.turnstileSiteKey };
 };
 

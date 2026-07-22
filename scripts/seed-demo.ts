@@ -1,11 +1,13 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { eq } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { createDb } from '../src/lib/server/db';
 import { users, watches } from '../src/lib/server/db/schema';
-import { createSession, putOn } from '../src/lib/server/sessions';
+import { refreshDemoHistory } from '../src/lib/server/demo';
 import { hashPassword } from '../src/lib/server/passwords';
 import { savePhoto } from '../src/lib/server/photos';
 
@@ -18,11 +20,20 @@ const pool = new Pool({
 const db = createDb(pool);
 await migrate(db, { migrationsFolder: 'drizzle' });
 
-// Scratch-only script: the demo account uses a fixed, public password, so
-// refuse any database that already has users — same guard as seed.ts. Run
-// against production this would mint a real known-credential account.
-if ((await db.select({ id: users.id }).from(users)).length > 0) {
-	console.error('Database is not empty — refusing to seed. Reset the scratch DB to reseed.');
+// Refuse if a demo account already exists (runtime keeps its history fresh;
+// re-provisioning would duplicate watches/photos). Provisioning into a live,
+// non-empty database is legitimate exactly once per instance — require an
+// explicit env opt-in so a stray local run against production can't happen.
+if ((await db.select({ id: users.id }).from(users).where(eq(users.isDemo, true)).limit(1)).length > 0) {
+	console.error('A demo user already exists — nothing to do.');
+	await pool.end();
+	process.exit(1);
+}
+if (
+	(await db.select({ id: users.id }).from(users)).length > 0 &&
+	process.env.SEED_DEMO_ALLOW_EXISTING !== '1'
+) {
+	console.error('Database is not empty — set SEED_DEMO_ALLOW_EXISTING=1 to provision the demo into a live database.');
 	await pool.end();
 	process.exit(1);
 }
@@ -31,23 +42,12 @@ const [demoUser] = await db
 	.insert(users)
 	.values({
 		email: 'demo@onwrist.watch',
-		passwordHash: await hashPassword('demo-preview'),
+		passwordHash: await hashPassword(crypto.randomBytes(32).toString('base64url')),
 		emailVerifiedAt: new Date(),
-		isDemo: true
+		isDemo: true,
+		staleSessionHours: 168
 	})
 	.returning();
-
-// Deterministic PRNG so reseeding is reproducible.
-function mulberry32(a: number) {
-	return () => {
-		a |= 0; a = (a + 0x6d2b79f5) | 0;
-		let t = Math.imul(a ^ (a >>> 15), 1 | a);
-		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
-const rand = mulberry32(7);
-const pick = <T>(arr: T[]) => arr[Math.floor(rand() * arr.length)];
 
 const COLLECTION = [
 	{
@@ -189,55 +189,7 @@ for (const w of COLLECTION) {
 	await savePhoto(db, demoUser.id, row.id, file);
 }
 
-// Favorites get worn more: weight by position (earlier = more worn).
-const weighted = ids.flatMap((id, i) => Array(Math.max(1, 8 - i)).fill(id));
+await refreshDemoHistory(db, demoUser.id, new Date(Number(process.env.SEED_ANCHOR_MS ?? Date.now())));
 
-const NOTES = [
-	'dinner out', 'weekend errands', 'office day', 'date night', 'travel day',
-	'gym then brunch', 'first wear after service', 'lazy Sunday'
-];
-
-const DAY = 86_400_000;
-const anchor = new Date(Number(process.env.SEED_ANCHOR_MS ?? Date.now()));
-const startOfDay = (d: Date) => new Date(Math.floor(d.getTime() / DAY) * DAY);
-
-let sessions = 0;
-for (let daysAgo = 120; daysAgo >= 1; daysAgo--) {
-	if (rand() < 0.08) continue; // no-watch day
-	const day = startOfDay(new Date(anchor.getTime() - daysAgo * DAY));
-	const at = (h: number, extraMin: number) => new Date(day.getTime() + h * 3_600_000 + extraMin * 60_000);
-	const watchId = pick(weighted);
-	const start = at(14, Math.floor(rand() * 90)); // ~6:30-8:00 AM Pacific in UTC
-	const note = rand() < 0.15 ? pick(NOTES) : undefined;
-
-	if (rand() < 0.12) {
-		// midday swap: two back-to-back sessions
-		const mid = at(20, Math.floor(rand() * 60));
-		const end = at(29, Math.floor(rand() * 90)); // 9-10:30 PM Pacific
-		await createSession(db, demoUser.id, { watchId, startedAt: start, endedAt: mid, note });
-		await createSession(db, demoUser.id, {
-			watchId: pick(weighted.filter((i) => i !== watchId)),
-			startedAt: mid,
-			endedAt: end
-		});
-	} else if (rand() < 0.04) {
-		// overnight: worn late, off early the next morning
-		await createSession(db, demoUser.id, { watchId, startedAt: start, endedAt: at(37, 0), note: note ?? 'late night' });
-	} else {
-		await createSession(db, demoUser.id, {
-			watchId,
-			startedAt: start,
-			endedAt: at(28, Math.floor(rand() * 150)),
-			note
-		});
-	}
-	sessions++;
-}
-
-// Currently wearing something — nice "on wrist" state for screenshots.
-await putOn(db, demoUser.id, { watchId: ids[0], at: new Date(anchor.getTime() - 3 * 3_600_000), source: 'web' });
-
-console.log(
-	`Seeded demo user (${demoUser.email}) with ${ids.length} watches, ${ids.length} photos, and ~${sessions} wear days (one session still open).`
-);
+console.log(`Provisioned demo user (${demoUser.email}) with ${ids.length} watches and photos; wear history anchored at now.`);
 await pool.end();
