@@ -17,12 +17,12 @@
 		<div class="actions">
 			<a class="button primary" href="/signup">Create account</a>
 			<a class="button ghost" href="/login">Sign in</a>
-			{#if demoAvailable}
-				<form method="POST" action="/?/demo" use:enhance>
-					<button type="submit" class="button ghost">Try the demo</button>
-				</form>
-			{/if}
 		</div>
+		{#if demoAvailable}
+			<form class="demo-form" method="POST" action="/?/demo" use:enhance>
+				<button type="submit" class="demo-link">Try the demo <span aria-hidden="true">→</span></button>
+			</form>
+		{/if}
 		{#if page.form?.message}
 			<p class="demo-error" role="alert">{page.form.message}</p>
 		{/if}
@@ -127,8 +127,23 @@
 		padding: 0.65rem 1.4rem;
 		font-size: 0.95rem;
 	}
-	.actions form {
-		display: contents;
+	.demo-form {
+		margin: 1rem 0 0;
+	}
+	.demo-link {
+		background: none;
+		border: 0;
+		padding: 0;
+		font-family: var(--font-display);
+		font-size: 0.8rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--fg-muted);
+		cursor: pointer;
+	}
+	.demo-link:hover {
+		color: var(--fg);
 	}
 
 	.demo-error {
