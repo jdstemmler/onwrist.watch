@@ -100,7 +100,10 @@
 <style>
 	/* dataviz palette — --series-N custom properties are declared once in
 	   src/routes/stats/+page.svelte; this component only references var(--series-N)
-	   via slotVar(). */
+	   via slotVar(). Base .swatch sizing comes from app.css, keyed off
+	   .chart-palette; this component only adds flex: none since its swatches
+	   sit inline in flex rows (list items, table cells) that would otherwise
+	   shrink them. */
 
 	.rotation-health {
 		display: grid;
@@ -115,11 +118,7 @@
 		color: var(--fg-muted);
 		margin: 0 0 0.5rem;
 	}
-	.swatch {
-		width: 10px;
-		height: 10px;
-		border-radius: 2px;
-		display: inline-block;
+	.rotation-health .swatch {
 		flex: none;
 	}
 	.neglect-list {

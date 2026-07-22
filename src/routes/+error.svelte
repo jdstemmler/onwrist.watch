@@ -8,7 +8,7 @@
 
 <div class="gate">
 	<div class="card">
-		<p class="kicker"><span class="dot"></span>{page.status}</p>
+		<p class="kicker"><span class="dot error"></span>{page.status}</p>
 		<h1>{page.status === 404 ? 'Not found' : 'Something went wrong'}</h1>
 		<p class="lead">
 			{page.status === 404
@@ -35,26 +35,8 @@
 		text-align: center;
 	}
 
-	.kicker {
-		font-family: var(--font-display);
-		font-size: 0.78rem;
-		font-weight: 600;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
-		margin: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-	}
-
-	.dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		border: 1.5px solid var(--danger);
-	}
+	/* .kicker/.dot come from app.css — this page's dot is always in the
+	   error/danger ring state (class="dot error"), never toggled. */
 
 	h1 {
 		font-size: 1.3rem;

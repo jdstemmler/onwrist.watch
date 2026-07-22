@@ -176,7 +176,8 @@
 <style>
 	/* dataviz palette — --series-N custom properties are declared once in
 	   src/routes/stats/+page.svelte; this component only references var(--series-N)
-	   via slotVar(). */
+	   via slotVar(). Legend/swatch chrome (.legend/.swatch) comes from app.css,
+	   keyed off .chart-palette. */
 
 	.year-nav {
 		display: flex;
@@ -207,6 +208,9 @@
 	svg {
 		display: block;
 	}
+	/* Deliberate exception to the shared 11px .ytick/.xtick size: cells are a
+	   fixed 12px, so month/day-of-week labels need to be small enough not to
+	   crowd a single cell's width. */
 	.month,
 	.dow {
 		font-size: 9px;
@@ -240,27 +244,6 @@
 	}
 	.ramp {
 		gap: 0.25rem;
-	}
-	.legend {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.6rem 1rem;
-		list-style: none;
-		margin: 0.6rem 0 0;
-		padding: 0;
-	}
-	.legend li {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.8rem;
-		color: var(--fg-muted);
-	}
-	.swatch {
-		width: 10px;
-		height: 10px;
-		border-radius: 2px;
-		display: inline-block;
 	}
 	.empty-swatch {
 		background: color-mix(in srgb, var(--border) 60%, transparent);

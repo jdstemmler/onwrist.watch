@@ -41,7 +41,7 @@
 	}
 </script>
 
-<div class="monthly-trend">
+<div class="chart-palette monthly-trend">
 	<svg viewBox="0 0 {PLOT_W + 40} {PLOT_H + 34}" role="img" aria-label="Hours worn per month">
 		<g transform="translate(32, 0)">
 			{#each ticks as t (t)}
@@ -69,24 +69,14 @@
 </div>
 
 <style>
+	/* Axis chrome (.gridline/.baseline/.ytick/.xtick) comes from app.css, keyed
+	   off .chart-palette — this chart is single-series (no watch legend), but
+	   shares the same axis vocabulary as the multi-series charts. */
+
 	.monthly-trend svg {
 		width: 100%;
 		height: auto;
 		overflow: visible;
-	}
-	.gridline {
-		stroke: var(--border);
-		stroke-width: 1;
-	}
-	.baseline {
-		stroke: var(--fg-muted);
-		stroke-width: 1;
-	}
-	.ytick,
-	.xtick {
-		fill: var(--fg-muted);
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
 	}
 	.bar {
 		fill: var(--accent);

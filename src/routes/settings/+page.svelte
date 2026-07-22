@@ -17,7 +17,7 @@
 </header>
 
 <section class="card">
-	<p class="kicker"><span class="dot" class:on={data.verified}></span>Regulation</p>
+	<p class="kicker left-align"><span class="dot" class:on={data.verified}></span>Regulation</p>
 	<p class="muted">Signed in as <span class="num">{data.email}</span></p>
 	{#if !data.verified}
 		<div class="verify-row">
@@ -150,30 +150,12 @@
 		margin-bottom: 1.25rem;
 	}
 
-	.kicker {
-		font-family: var(--font-display);
-		font-size: 0.78rem;
-		font-weight: 600;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
+	/* .kicker/.dot/.dot.on come from app.css; this page's kicker sits in a
+	   left-aligned card (unlike the centered auth-gate cards), so it keeps
+	   its own alignment + spacing. */
+	.kicker.left-align {
+		justify-content: flex-start;
 		margin: 0 0 0.5rem;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		border: 1.5px solid var(--fg-muted);
-	}
-
-	.dot.on {
-		border: none;
-		background: var(--accent);
-		box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 65%, transparent);
 	}
 
 	.verify-row {

@@ -95,46 +95,12 @@
 <style>
 	/* dataviz palette — --series-N custom properties are declared once in
 	   src/routes/stats/+page.svelte; this component only references var(--series-N)
-	   via slotVar(). */
+	   via slotVar(). Axis (.gridline/.baseline/.ytick/.xtick) and legend
+	   (.legend/.swatch) chrome come from app.css, keyed off .chart-palette. */
 
 	.dow-chart svg {
 		width: 100%;
 		height: auto;
 		overflow: visible;
-	}
-	.gridline {
-		stroke: var(--border);
-		stroke-width: 1;
-	}
-	.baseline {
-		stroke: var(--fg-muted);
-		stroke-width: 1;
-	}
-	.ytick,
-	.xtick {
-		fill: var(--fg-muted);
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
-	}
-	.legend {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.6rem 1rem;
-		list-style: none;
-		margin: 0.5rem 0 0;
-		padding: 0;
-	}
-	.legend li {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.8rem;
-		color: var(--fg-muted);
-	}
-	.swatch {
-		width: 10px;
-		height: 10px;
-		border-radius: 2px;
-		display: inline-block;
 	}
 </style>

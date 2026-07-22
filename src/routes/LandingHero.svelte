@@ -8,7 +8,7 @@
 
 <section class="hero">
 	<div class="pitch">
-		<p class="kicker"><span class="dot"></span>Watch collection tracker</p>
+		<p class="kicker"><span class="dot solid"></span>Watch collection tracker</p>
 		<h1>{appName}</h1>
 		<p class="tagline">
 			Log what's on your wrist, track your collection, and see where the hours go. Free — no
@@ -36,7 +36,7 @@
 
 <section class="band">
 	<div class="band-copy">
-		<p class="kicker"><span class="dot"></span>Wear stats, automatically</p>
+		<p class="kicker"><span class="dot solid"></span>Wear stats, automatically</p>
 		<h2>See where the hours go</h2>
 		<p class="tagline">
 			Wrist-time share, day-of-week rhythm, time-of-day habits, a wear calendar, and cost-per-wear —
@@ -83,24 +83,8 @@
 		gap: 1.1rem;
 	}
 
-	.kicker {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-family: var(--font-display);
-		font-size: 0.76rem;
-		font-weight: 600;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--fg-muted);
-		margin: 0;
-	}
-	.dot {
-		width: 0.5rem;
-		height: 0.5rem;
-		border-radius: 50%;
-		background: var(--accent);
-	}
+	/* .kicker/.dot come from app.css — this hero's dot is permanently lit
+	   (class="dot solid"), there's no on/off state to represent. */
 
 	.pitch h1 {
 		font-size: clamp(2.4rem, 6vw, 3.4rem);

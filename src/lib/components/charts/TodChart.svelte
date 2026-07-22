@@ -38,7 +38,7 @@
 	const share = $derived(areaPath(wearingShareByHour, 1, PLOT_H));
 </script>
 
-<div class="tod-chart">
+<div class="chart-palette tod-chart">
 	<section>
 		<h3>Put-on times</h3>
 		<svg viewBox="0 0 {PLOT_W + 40} {PLOT_H + 26}" role="img" aria-label="Number of times a watch was put on, by hour of day">
@@ -108,24 +108,13 @@
 		color: var(--fg-muted);
 		margin: 0 0 0.35rem;
 	}
+	/* Axis chrome (.gridline/.baseline/.ytick/.xtick) comes from app.css, keyed
+	   off .chart-palette — this chart is single-series (no watch legend), but
+	   shares the same axis vocabulary as the multi-series charts. */
 	svg {
 		width: 100%;
 		height: auto;
 		overflow: visible;
-	}
-	.gridline {
-		stroke: var(--border);
-		stroke-width: 1;
-	}
-	.baseline {
-		stroke: var(--fg-muted);
-		stroke-width: 1;
-	}
-	.ytick,
-	.xtick {
-		fill: var(--fg-muted);
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
 	}
 	.bar {
 		fill: var(--accent);

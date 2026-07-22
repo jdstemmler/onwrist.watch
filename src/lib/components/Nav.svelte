@@ -238,7 +238,7 @@
 		background: var(--bg-raised);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+		box-shadow: var(--shadow-lg);
 		overflow: hidden;
 	}
 	.menu-panel form {
