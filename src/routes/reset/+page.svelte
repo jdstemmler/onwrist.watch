@@ -21,16 +21,18 @@
 				{#if form?.message}
 					<p class="error" role="alert">{form.message}</p>
 				{/if}
-				<!-- svelte-ignore a11y_autofocus -->
-				<input
-					type="email"
-					name="email"
-					placeholder="email"
-					autocomplete="username"
-					aria-label="Email"
-					autofocus
-					required
-				/>
+				<label class="field">
+					<span class="lbl">Email</span>
+					<!-- svelte-ignore a11y_autofocus -->
+					<input
+						type="email"
+						name="email"
+						placeholder="you@example.com"
+						autocomplete="username"
+						autofocus
+						required
+					/>
+				</label>
 				<button type="submit" class="primary">Send reset link</button>
 			</form>
 			<div class="links">

@@ -30,6 +30,10 @@
 		-apple-system, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 	--font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
 
+	/* Native form-control tint (checkbox/radio/range) — brand green instead
+	   of the browser-default blue. */
+	accent-color: var(--accent);
+
 	color-scheme: light;
 }
 
@@ -264,12 +268,17 @@ fieldset::after {
 	grid-column: 1 / -1;
 }
 
+/* Brand-green focus ring everywhere — not the browser-default blue, and not
+   --navy either (a dedicated link color, not a state color). Contrast is
+   checked against both themes' surfaces: --accent is dark enough on the
+   light bg/bg-raised and light enough on the dark bg/bg-raised to clear the
+   3:1 non-text contrast minimum in both directions. */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 button:focus-visible,
 a:focus-visible {
-	outline: 2px solid var(--navy);
+	outline: 2px solid var(--accent);
 	outline-offset: 2px;
 }
 

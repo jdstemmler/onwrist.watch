@@ -123,7 +123,8 @@
 		background: var(--bg-raised);
 	}
 
-	/* NATO stripe: navy / olive / navy */
+	/* Accent line under the top nav — brand green, not the off-palette blue
+	   this used to borrow from --navy. */
 	nav::after {
 		content: '';
 		position: absolute;
@@ -131,12 +132,7 @@
 		right: 0;
 		bottom: 0;
 		height: 3px;
-		background: linear-gradient(
-			90deg,
-			var(--navy) 0 25%,
-			var(--accent) 25% 75%,
-			var(--navy) 75% 100%
-		);
+		background: var(--accent);
 	}
 	@media (prefers-color-scheme: dark) {
 		:global(:root:not([data-theme='light'])) nav::after {
@@ -200,7 +196,7 @@
 		right: 0;
 		bottom: -1px;
 		height: 2px;
-		background: var(--navy);
+		background: var(--accent);
 		border-radius: 1px;
 	}
 

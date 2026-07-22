@@ -34,25 +34,29 @@
 				{#if form?.message}
 					<p class="error" role="alert">{form.message}</p>
 				{/if}
-				<!-- svelte-ignore a11y_autofocus -->
-				<input
-					type="email"
-					name="email"
-					placeholder="email"
-					autocomplete="email"
-					aria-label="Email"
-					autofocus
-					required
-				/>
-				<input
-					type="password"
-					name="password"
-					placeholder="password (10+ characters)"
-					autocomplete="new-password"
-					aria-label="Password"
-					minlength="10"
-					required
-				/>
+				<label class="field">
+					<span class="lbl">Email</span>
+					<!-- svelte-ignore a11y_autofocus -->
+					<input
+						type="email"
+						name="email"
+						placeholder="you@example.com"
+						autocomplete="email"
+						autofocus
+						required
+					/>
+				</label>
+				<label class="field">
+					<span class="lbl">Password</span>
+					<input
+						type="password"
+						name="password"
+						placeholder="10+ characters"
+						autocomplete="new-password"
+						minlength="10"
+						required
+					/>
+				</label>
 				<div class="cf-turnstile" data-sitekey={data.turnstileSiteKey} data-theme={turnstileTheme}></div>
 				<button type="submit" class="primary">Create account</button>
 			</form>

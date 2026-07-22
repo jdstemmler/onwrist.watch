@@ -29,24 +29,22 @@
 			<p class="error" role="alert">{form.message}</p>
 		{/if}
 		<input type="hidden" name="next" value={data.next} />
-		<!-- svelte-ignore a11y_autofocus -->
-		<input
-			type="email"
-			name="email"
-			placeholder="email"
-			autocomplete="username"
-			aria-label="Email"
-			autofocus
-			required
-		/>
-		<input
-			type="password"
-			name="password"
-			placeholder="password"
-			autocomplete="current-password"
-			aria-label="Password"
-			required
-		/>
+		<label class="field">
+			<span class="lbl">Email</span>
+			<!-- svelte-ignore a11y_autofocus -->
+			<input
+				type="email"
+				name="email"
+				placeholder="you@example.com"
+				autocomplete="username"
+				autofocus
+				required
+			/>
+		</label>
+		<label class="field">
+			<span class="lbl">Password</span>
+			<input type="password" name="password" autocomplete="current-password" required />
+		</label>
 		<button type="submit" class="primary">Unlock</button>
 		<div class="links">
 			<a href="/reset">Forgot password?</a>

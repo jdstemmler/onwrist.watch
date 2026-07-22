@@ -17,17 +17,19 @@
 			<p class="error" role="alert">{form.message}</p>
 		{/if}
 		<input type="hidden" name="token" value={data.token} />
-		<!-- svelte-ignore a11y_autofocus -->
-		<input
-			type="password"
-			name="password"
-			placeholder="new password (10+ characters)"
-			autocomplete="new-password"
-			aria-label="New password"
-			minlength="10"
-			autofocus
-			required
-		/>
+		<label class="field">
+			<span class="lbl">New password</span>
+			<!-- svelte-ignore a11y_autofocus -->
+			<input
+				type="password"
+				name="password"
+				placeholder="10+ characters"
+				autocomplete="new-password"
+				minlength="10"
+				autofocus
+				required
+			/>
+		</label>
 		<button type="submit" class="primary">Set password</button>
 		<div class="links">
 			<a href="/login">Back to login</a>
