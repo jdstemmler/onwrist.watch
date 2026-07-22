@@ -17,6 +17,12 @@
 
 {#if !GATE_ROUTES.has(page.route.id ?? '') && !isLandingRoute}
 	<Nav appName={data.appName} email={data.email} isAdmin={data.role === 'admin'} />
+	{#if data.demo}
+		<div class="demo-banner">
+			<p>You're browsing a read-only demo.</p>
+			<a href="/signup">Create your own account</a>
+		</div>
+	{/if}
 	{#if data.email && !data.verified}
 		<div class="unverified-banner">
 			<p>Verify your email to add watches.</p>
@@ -41,6 +47,29 @@
 <main>{@render children()}</main>
 
 <style>
+	.demo-banner {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: 0.6rem;
+		padding: 0.5rem 1rem;
+		background: color-mix(in srgb, var(--accent) 12%, var(--bg-raised));
+		border-bottom: 1px solid var(--border);
+		font-size: 0.82rem;
+		text-align: center;
+	}
+
+	.demo-banner p {
+		margin: 0;
+		color: var(--fg);
+	}
+
+	.demo-banner a {
+		font-weight: 600;
+		color: var(--accent);
+	}
+
 	.unverified-banner {
 		display: flex;
 		flex-wrap: wrap;
