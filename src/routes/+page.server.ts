@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
 import { listWatchesWithMeta } from '$lib/server/watches';
+import { getState } from '$lib/server/state';
 import { SESSION_COOKIE } from '$lib/server/auth';
 import { demoLogin, findDemoUser } from '$lib/server/demo';
 
@@ -10,11 +11,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) {
 		return { landing: true as const, demoAvailable: (await findDemoUser(db)) !== null };
 	}
-	const rows = await listWatchesWithMeta(db, locals.user.id, locals.user.homeTz, new Date());
+	const [rows, state] = await Promise.all([
+		listWatchesWithMeta(db, locals.user.id, locals.user.homeTz, new Date()),
+		getState(db, locals.user.id, locals.user.homeTz)
+	]);
 	return {
 		landing: false as const,
 		owned: rows.filter((r) => r.watch.status === 'owned'),
-		sold: rows.filter((r) => r.watch.status === 'sold')
+		sold: rows.filter((r) => r.watch.status === 'sold'),
+		wearingId: state.wearing?.id ?? null
 	};
 };
 

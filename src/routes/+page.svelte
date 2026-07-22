@@ -26,7 +26,7 @@
 	{:else}
 		<div class="grid">
 			{#each data.owned as { watch, primaryPhoto, stats }}
-				<a class="card" href="/watches/{watch.id}">
+				<a class="card" class:on-wrist={watch.id === data.wearingId} href="/watches/{watch.id}">
 					<div class="photo">
 						{#if primaryPhoto}
 							<img src={photoUrl(primaryPhoto)} alt={stats.label} loading="lazy" />
@@ -40,9 +40,14 @@
 							</div>
 						{/if}
 					</div>
+					{#if watch.id === data.wearingId}
+						<p class="kicker onwrist"><span class="dot on"></span>On wrist</p>
+					{/if}
 					<h2>{stats.label}</h2>
 					<p class="sub">{watch.brand} {watch.model}{watch.referenceNo ? ` · ${watch.referenceNo}` : ''}</p>
-					<p class="meta num">{stats.wears} wears · {Math.round(stats.hours)}h · last worn {fmtDate(stats.lastWornAt)}</p>
+					<p class="meta num"><span class="seg">{stats.wears} wears</span> · <span class="seg"
+						>{Math.round(stats.hours)}h</span
+					> · <span class="seg">last worn {fmtDate(stats.lastWornAt)}</span></p>
 				</a>
 			{/each}
 		</div>
@@ -88,10 +93,13 @@
 	.grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+		align-items: stretch;
 		gap: 1.1rem;
 	}
 
 	.card {
+		display: flex;
+		flex-direction: column;
 		text-decoration: none;
 		color: inherit;
 		transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
@@ -101,6 +109,23 @@
 		transform: translateY(-2px);
 		border-color: var(--accent);
 		box-shadow: var(--shadow-lg);
+	}
+
+	/* On-wrist cue: a stronger border (the default olive tint alone is too
+	   faint in light mode) plus the .kicker/.dot.on eyebrow shared with the
+	   wear log — same "currently worn" vocabulary in both places. */
+	.card.on-wrist {
+		border-color: var(--accent);
+		box-shadow: var(--shadow), inset 0 0 0 1px var(--accent);
+	}
+
+	.card.on-wrist:hover {
+		box-shadow: var(--shadow-lg), inset 0 0 0 1px var(--accent);
+	}
+
+	.kicker.onwrist {
+		justify-content: flex-start;
+		margin: 0 0 0.35rem;
 	}
 
 	.photo {
@@ -141,8 +166,15 @@
 
 	.meta {
 		font-size: 0.78rem;
-		margin: 0;
+		margin: auto 0 0;
 		color: var(--fg-muted);
+	}
+
+	/* Only allow line breaks at the " · " separators — each segment stays
+	   intact so a trailing token (e.g. "30" from "last worn Jun 30") never
+	   wraps onto its own line. */
+	.meta .seg {
+		white-space: nowrap;
 	}
 
 	details.sold {
