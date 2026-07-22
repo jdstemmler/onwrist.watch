@@ -40,6 +40,11 @@ describe('findDemoUser', () => {
 		await db.update(users).set({ isDemo: false }).where(eq(users.id, demoId));
 		expect(await findDemoUser(db)).toBeNull();
 	});
+
+	it('ignores a disabled demo user', async () => {
+		await db.update(users).set({ disabledAt: T0 }).where(eq(users.id, demoId));
+		expect(await findDemoUser(db)).toBeNull();
+	});
 });
 
 describe('refreshDemoHistory', () => {

@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { DB } from './db';
 import { users, watches, wearSessions } from './db/schema';
 import { createSession, getOpenSession, lockUser, putOn } from './sessions';
@@ -13,7 +13,11 @@ const DAY = 86_400_000;
 export const DEMO_STALE_MS = 24 * HOUR;
 
 export async function findDemoUser(db: DB): Promise<{ id: number } | null> {
-	const rows = await db.select({ id: users.id }).from(users).where(eq(users.isDemo, true)).limit(1);
+	const rows = await db
+		.select({ id: users.id })
+		.from(users)
+		.where(and(eq(users.isDemo, true), isNull(users.disabledAt)))
+		.limit(1);
 	return rows[0] ?? null;
 }
 

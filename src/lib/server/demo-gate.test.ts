@@ -43,4 +43,13 @@ describe('demoWriteGate', () => {
 		expect(demoWriteGate(member, write, urlOf(write))).toBeNull();
 		expect(demoWriteGate(null, write, urlOf(write))).toBeNull();
 	});
+
+	it('exempts public-surface POSTs so the signup funnel works from inside the demo', () => {
+		for (const path of ['/signup', '/verify', '/login?/login', '/?/demo', '/reset']) {
+			const req = post(path);
+			expect(demoWriteGate(demoUser, req, urlOf(req))).toBeNull();
+		}
+		const still = post('/watches/3/edit?/update');
+		expect(demoWriteGate(demoUser, still, urlOf(still))?.status).toBe(409);
+	});
 });

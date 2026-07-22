@@ -15,7 +15,7 @@ function safeNext(raw: string | null): string {
 }
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	if (locals.user) {
+	if (locals.user && !locals.user.isDemo) {
 		redirect(303, safeNext(url.searchParams.get('next')));
 	}
 	return { next: url.searchParams.get('next') ?? '/' };

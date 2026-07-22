@@ -44,7 +44,8 @@ const [demoUser] = await db
 		email: 'demo@onwrist.watch',
 		passwordHash: await hashPassword(crypto.randomBytes(32).toString('base64url')),
 		emailVerifiedAt: new Date(),
-		isDemo: true
+		isDemo: true,
+		staleSessionHours: 168
 	})
 	.returning();
 
