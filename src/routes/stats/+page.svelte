@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import { assignSlots } from '$lib/components/charts/palette';
 	import WristShare from '$lib/components/charts/WristShare.svelte';
+	import DowTodHeatmap from '$lib/components/charts/DowTodHeatmap.svelte';
 	import DowChart from '$lib/components/charts/DowChart.svelte';
 	import TodChart from '$lib/components/charts/TodChart.svelte';
 	import TodByWatchChart from '$lib/components/charts/TodByWatchChart.svelte';
@@ -58,6 +59,12 @@
 		</p>
 	</section>
 {:else}
+<!-- The cards run one question at a time, each adding a dimension to the last:
+     which watches → when you wear anything → which watch, hour by hour → which
+     watch, weekday by weekday → which watch, day by day → what to do about it.
+     Anything that restated an earlier card rather than extending it is gone
+     (the old per-hour "wearing share" curve was both the column marginal of the
+     weekday × hour heatmap and a rescale of the by-watch stack's total). -->
 <section class="card">
 	<h2>Wrist-time share</h2>
 	<p class="muted">Total hours worn, all time.</p>
@@ -65,21 +72,27 @@
 </section>
 
 <section class="card">
-	<h2>Day of week</h2>
-	<p class="muted">Hours worn per weekday, stacked by watch.</p>
-	<DowChart rows={data.byDow} {colorSlots} />
+	<h2>Weekly rhythm</h2>
+	<p class="muted">How often a watch is on your wrist, hour by hour across the week.</p>
+	<DowTodHeatmap shares={data.dowTod.shares} hours={data.dowTod.hours} weekdayCounts={data.dowTod.weekdayCounts} />
 </section>
 
 <section class="card">
 	<h2>Time of day</h2>
-	<p class="muted">When watches go on, and how much of the day they stay on.</p>
-	<TodChart putOnByHour={data.byTod.putOnByHour} wearingShareByHour={data.byTod.wearingShareByHour} />
+	<p class="muted">When watches go on, and which one owns which hour.</p>
+	<!-- Two panels on one hour axis: the put-on histogram and the by-watch
+	     stack share the same 36px gutter and 700px plot, so a spike at 7a sits
+	     directly above the band that spike starts. -->
+	<div class="panels">
+		<TodChart putOnByHour={data.putOnByHour} />
+		<TodByWatchChart rows={data.todByWatch} {colorSlots} />
+	</div>
 </section>
 
 <section class="card">
-	<h2>Watch by time of day</h2>
-	<p class="muted">Which watch owns which hour, all time.</p>
-	<TodByWatchChart rows={data.todByWatch} {colorSlots} />
+	<h2>Day of week</h2>
+	<p class="muted">Hours worn per weekday, stacked by watch.</p>
+	<DowChart rows={data.byDow} {colorSlots} />
 </section>
 
 <section class="card">
@@ -194,5 +207,11 @@
 		margin-top: 0;
 		margin-bottom: 0.85rem;
 		font-size: 0.85rem;
+	}
+	/* Same rhythm TodChart uses between its own stacked panels, so a card
+	   holding two chart components reads like one holding two <section>s. */
+	.panels {
+		display: grid;
+		gap: 1.25rem;
 	}
 </style>

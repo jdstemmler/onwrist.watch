@@ -472,6 +472,27 @@ form:focus-within .dot {
    legend. Charts assume an SVG with .gridline/.baseline lines and
    .ytick/.xtick labels, plus (where there's more than one series) either a
    <ul class="legend"><li><span class="swatch"> or a bare .swatch. */
+/* Panel heading inside a chart card: the card's <h2> names the question, an
+   <h3> names each panel under it ("Put-on times", "Neglect — longest since
+   last worn"). Muted small-caps so it reads as a label on the plot, not as a
+   second title competing with the card's own. `.qualifier` demotes the trailing
+   clause of a heading ("— of that weekday") out of the small-caps treatment. */
+.chart-palette h3 {
+	font-family: var(--font-sans);
+	font-size: 0.8rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--fg-muted);
+	margin: 0 0 0.35rem;
+}
+
+.chart-palette h3 .qualifier {
+	font-weight: 400;
+	text-transform: none;
+	letter-spacing: 0;
+}
+
 .chart-palette .gridline {
 	stroke: var(--border);
 	stroke-width: 1;

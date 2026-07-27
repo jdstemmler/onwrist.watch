@@ -88,6 +88,7 @@
 	<p class="muted">No wear logged yet.</p>
 {:else}
 	<div class="chart-palette todw-chart">
+		<h3>Hours on the wrist <span class="qualifier">— by watch</span></h3>
 		<svg
 			viewBox="0 -8 {PLOT_W + 40} {PLOT_H + 38}"
 			role="img"
@@ -124,8 +125,9 @@
 {/if}
 
 <style>
-	/* --series-N values, and axis/legend chrome (.gridline/.baseline/.ytick/
-	   .xtick/.legend/.swatch), come from app.css, keyed off .chart-palette. */
+	/* --series-N values, and axis/legend/heading chrome (.gridline/.baseline/
+	   .ytick/.xtick/.legend/.swatch/h3), come from app.css, keyed off
+	   .chart-palette. */
 
 	svg {
 		width: 100%;

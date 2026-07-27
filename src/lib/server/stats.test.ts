@@ -3,7 +3,7 @@ import type { DB } from './db';
 import { createTestDb } from './db/test-utils';
 import { users, watches } from './db/schema';
 import { createSession, putOn } from './sessions';
-import { sliceSession, statsByWatch, statsByDow, statsByTod, statsTodByWatch, statsCalendar, statsSummary, statsWatchDetail } from './stats';
+import { sliceSession, statsByWatch, statsByDow, statsDowTod, statsPutOnByHour, statsTodByWatch, statsCalendar, statsSummary, statsWatchDetail } from './stats';
 
 const TZ = 'America/Los_Angeles';
 const NOW = new Date('2026-07-15T00:00:00Z'); // 5 PM PDT July 14
@@ -99,7 +99,7 @@ describe('statsByWatch gifts', () => {
 	});
 });
 
-describe('statsByDow / statsByTod / statsCalendar / statsSummary', () => {
+describe('statsByDow / statsPutOnByHour / statsDowTod / statsCalendar / statsSummary', () => {
 	beforeEach(async () => {
 		// Monday July 13: Speedy 7 AM - 3 PM PDT (14:00-22:00Z)
 		await createSession(db, alice, { watchId: speedy, startedAt: new Date('2026-07-13T14:00:00Z'), endedAt: new Date('2026-07-13T22:00:00Z') });
@@ -125,12 +125,41 @@ describe('statsByDow / statsByTod / statsCalendar / statsSummary', () => {
 		expect(rows).toContainEqual({ hour: 9, watchId: datejust, label: 'Rolex Datejust', hours: 1 });
 	});
 
-	it('by-tod counts put-on hour and wearing share', async () => {
-		const t = await statsByTod(db, alice, TZ, NOW);
-		expect(t.putOnByHour[7]).toBe(1); // Speedy on at 7 AM
-		expect(t.putOnByHour[8]).toBe(1); // Datejust on at 8 AM
-		expect(t.wearingShareByHour[9]).toBeGreaterThan(0); // both worn across 9 AM
-		expect(t.wearingShareByHour[3]).toBe(0); // never worn at 3 AM
+	it('put-on-by-hour counts session starts in the local hour', async () => {
+		const putOn = await statsPutOnByHour(db, alice, TZ, NOW);
+		expect(putOn[7]).toBe(1); // Speedy on at 7 AM
+		expect(putOn[8]).toBe(1); // Datejust on at 8 AM
+		expect(putOn[3]).toBe(0); // never put on at 3 AM
+	});
+
+	it('dow-tod grids wrist time by local weekday and hour', async () => {
+		const g = await statsDowTod(db, alice, TZ, NOW);
+		// Tracking window is Mon Jul 13 → Tue Jul 14: one Monday, one Tuesday.
+		expect(g.weekdayCounts).toEqual([0, 1, 1, 0, 0, 0, 0]);
+		expect(g.hours[1][9]).toBe(1); // Speedy across 9 AM Monday
+		expect(g.hours[2][9]).toBe(1); // Datejust across 9 AM Tuesday
+		// 7 AM is Monday-only, 3 PM Tuesday-only — the interaction the old
+		// per-hour curve averaged away.
+		expect(g.shares[1][7]).toBe(1);
+		expect(g.shares[2][7]).toBe(0);
+		expect(g.shares[1][15]).toBe(0);
+		expect(g.shares[2][15]).toBe(1);
+		expect(g.shares[1][3]).toBe(0); // never worn at 3 AM
+	});
+
+	it('dow-tod divides each weekday by how often that weekday came around', async () => {
+		// Backdate the window to Mon Jul 6, so it holds two Mondays and two
+		// Tuesdays but only one of every other weekday. Datejust 8-9 AM PDT.
+		await createSession(db, alice, {
+			watchId: datejust,
+			startedAt: new Date('2026-07-06T15:00:00Z'),
+			endedAt: new Date('2026-07-06T16:00:00Z')
+		});
+		const g = await statsDowTod(db, alice, TZ, NOW);
+		expect(g.weekdayCounts).toEqual([1, 2, 2, 1, 1, 1, 1]);
+		expect(g.shares[1][7]).toBeCloseTo(0.5, 5); // worn 1 of 2 Mondays at 7 AM
+		expect(g.shares[1][8]).toBeCloseTo(1, 5); // both Mondays at 8 AM
+		expect(g.shares[2][8]).toBeCloseTo(0.5, 5); // 1 of 2 Tuesdays at 8 AM
 	});
 
 	it('calendar picks the dominant watch per day', async () => {
