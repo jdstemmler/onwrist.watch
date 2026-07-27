@@ -4,6 +4,7 @@
 	import TodChart from '$lib/components/charts/TodChart.svelte';
 	import CalendarHeatmap from '$lib/components/charts/CalendarHeatmap.svelte';
 	import MonthlyTrend from '$lib/components/charts/MonthlyTrend.svelte';
+	import { WEEK, DOW_NAMES, DOW_INITIAL } from '$lib/week';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -22,8 +23,6 @@
 				if (result.type === 'success') clearPicker();
 			}
 	);
-
-	const DOW_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 	const MOVEMENT_LABEL: Record<string, string> = {
 		automatic: 'Automatic',
@@ -48,11 +47,13 @@
 	const primaryPhoto = $derived(sortedPhotos[0]);
 	const thumbPhotos = $derived(sortedPhotos.slice(1));
 
+	// Monday-first, like every other week in the app (src/lib/week.ts); the
+	// rows arrive keyed by raw dow (0 = Sunday).
 	const dowHours = $derived.by(() => {
 		const byDow = new Map(data.dow.map((r) => [r.dow, r.hours]));
-		return Array.from({ length: 7 }, (_, i) => byDow.get(i) ?? 0);
+		return WEEK.map((dow) => ({ dow, hours: byDow.get(dow) ?? 0 }));
 	});
-	const maxDowHours = $derived(Math.max(1, ...dowHours));
+	const maxDowHours = $derived(Math.max(1, ...dowHours.map((d) => d.hours)));
 
 	function money(cents: number, digits = 2): string {
 		return `$${(cents / 100).toFixed(digits)}`;
@@ -302,12 +303,16 @@
 	<section class="card dow">
 		<h2>By day of week</h2>
 		<div class="bars">
-			{#each dowHours as h, i}
+			{#each dowHours as { dow, hours } (dow)}
 				<div class="bar-col">
 					<div class="bar-track">
-						<div class="bar" style="height: {(h / maxDowHours) * 100}%" title="{h.toFixed(1)}h"></div>
+						<div
+							class="bar"
+							style="height: {(hours / maxDowHours) * 100}%"
+							title="{DOW_NAMES[dow]} · {hours.toFixed(1)}h"
+						></div>
 					</div>
-					<span class="bar-label muted">{DOW_LABELS[i]}</span>
+					<span class="bar-label muted">{DOW_INITIAL[dow]}</span>
 				</div>
 			{/each}
 		</div>

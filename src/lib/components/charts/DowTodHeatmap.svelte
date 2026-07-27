@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { WEEK, DOW_NAMES, DOW_SHORT } from '$lib/week';
+
 	// Wrist occupancy as a weekday × hour grid. This is the two-dimensional form
 	// of the old "wearing share" curve: that curve was the column marginal of
 	// this grid, and also a straight rescale of TodByWatchChart's stack total —
@@ -10,8 +12,6 @@
 		weekdayCounts
 	}: { shares: number[][]; hours: number[][]; weekdayCounts: number[] } = $props();
 
-	const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-	const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 	const HOURS = Array.from({ length: 24 }, (_, h) => h);
 	// Same tick hours as the two hour-axis charts on this page (TodChart,
 	// TodByWatchChart) — three plots reading the same clock should mark it in
@@ -51,10 +51,10 @@
 	<div
 		class="grid"
 		role="img"
-		aria-label="Share of time a watch is on the wrist, by weekday (rows) and hour of day (columns)"
+		aria-label="Share of time a watch is on the wrist, by weekday (rows, Monday to Sunday) and hour of day (columns)"
 	>
-		{#each DOW_SHORT as label, dow (dow)}
-			<span class="row-label">{label}</span>
+		{#each WEEK as dow (dow)}
+			<span class="row-label">{DOW_SHORT[dow]}</span>
 			{#each HOURS as h (h)}
 				<span class="cell lvl-{level(shares[dow][h])}" title={cellTitle(dow, h)}></span>
 			{/each}

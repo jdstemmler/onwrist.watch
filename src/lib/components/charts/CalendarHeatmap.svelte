@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { slotVar, stackOrder, OTHER_SLOT, OTHER_ID, OTHER_LABEL } from './palette';
+	import { weekIndex } from '$lib/week';
 
 	type Cell = { dayKey: string; watchId: number; label: string; hours: number };
 
@@ -26,7 +27,10 @@
 		return String(n).padStart(2, '0');
 	}
 
-	type Day = { dayKey: string; dow: number; col: number; month: number; date: number };
+	// `row` is the Monday-first screen row (0 = Monday), not the raw dow — it
+	// also sets where a column breaks, so the grid's weeks run Mon→Sun like
+	// every other week in the app.
+	type Day = { dayKey: string; row: number; col: number; month: number; date: number };
 
 	function keyToUtc(k: string): number {
 		const [y, m, d] = k.split('-').map(Number);
@@ -39,14 +43,14 @@
 		// no empty months before any logged data, no future months.
 		const start = Math.max(Date.UTC(year, 0, 1), firstDayKey ? keyToUtc(firstDayKey) : -Infinity);
 		const end = Math.min(Date.UTC(year, 11, 31), keyToUtc(todayKey));
-		const firstDow = new Date(start).getUTCDay();
+		const firstRow = weekIndex(new Date(start).getUTCDay());
 		let idx = 0;
 		for (let t = start; t <= end; t += 86_400_000) {
 			const d = new Date(t);
 			out.push({
 				dayKey: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`,
-				dow: d.getUTCDay(),
-				col: Math.floor((idx + firstDow) / 7),
+				row: weekIndex(d.getUTCDay()),
+				col: Math.floor((idx + firstRow) / 7),
 				month: d.getUTCMonth(),
 				date: d.getUTCDate()
 			});
@@ -131,14 +135,14 @@
 			{#each monthLabels as m}
 				<text x={LEFT_PAD + m.col * STEP} y={TOP_PAD - 5} class="month">{m.label}</text>
 			{/each}
-			<text x="0" y={TOP_PAD + 1 * STEP + CELL - 2} class="dow">M</text>
-			<text x="0" y={TOP_PAD + 3 * STEP + CELL - 2} class="dow">W</text>
-			<text x="0" y={TOP_PAD + 5 * STEP + CELL - 2} class="dow">F</text>
+			<text x="0" y={TOP_PAD + 0 * STEP + CELL - 2} class="dow">M</text>
+			<text x="0" y={TOP_PAD + 2 * STEP + CELL - 2} class="dow">W</text>
+			<text x="0" y={TOP_PAD + 4 * STEP + CELL - 2} class="dow">F</text>
 			{#each days as d (d.dayKey)}
 				{@const cell = byDayKey.get(d.dayKey)}
 				<rect
 					x={LEFT_PAD + d.col * STEP}
-					y={TOP_PAD + d.dow * STEP}
+					y={TOP_PAD + d.row * STEP}
 					width={CELL}
 					height={CELL}
 					rx="2"
