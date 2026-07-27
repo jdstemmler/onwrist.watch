@@ -1,7 +1,12 @@
 <script lang="ts">
 	import { niceTicks } from './palette';
 
-	let { putOnByHour, wearingShareByHour }: { putOnByHour: number[]; wearingShareByHour: number[] } = $props();
+	// `wearingShareByHour` is optional: the per-watch page pairs it with the
+	// put-on histogram, but /stats omits it — there the same quantity is the
+	// column marginal of the weekday × hour heatmap (DowTodHeatmap), and
+	// drawing it twice on one page was the page's main redundancy.
+	let { putOnByHour, wearingShareByHour }: { putOnByHour: number[]; wearingShareByHour?: number[] } =
+		$props();
 
 	const PLOT_W = 700;
 	const PLOT_H = 90;
@@ -20,7 +25,10 @@
 		const hr = h % 12 === 0 ? 12 : h % 12;
 		return `${hr}${period}`;
 	}
-	const xLabelHours = [0, 4, 8, 12, 16, 20];
+	// Same tick hours as TodByWatchChart and DowTodHeatmap — on /stats this
+	// chart sits directly above the by-watch stack on a shared hour axis, and
+	// two axes marked differently under one card heading read as two clocks.
+	const xLabelHours = [0, 6, 12, 18, 23];
 
 	function areaPath(values: number[], scaleMax: number, height: number) {
 		const pts = values.map((v, h) => {
@@ -35,17 +43,19 @@
 		return { line, area };
 	}
 
-	const share = $derived(areaPath(wearingShareByHour, 1, PLOT_H));
+	const share = $derived(wearingShareByHour ? areaPath(wearingShareByHour, 1, PLOT_H) : null);
 </script>
 
 <div class="chart-palette tod-chart">
 	<section>
 		<h3>Put-on times</h3>
 		<svg viewBox="0 0 {PLOT_W + 40} {PLOT_H + 26}" role="img" aria-label="Number of times a watch was put on, by hour of day">
-			<g transform="translate(30, 0)">
+			<!-- 36px gutter, matching TodByWatchChart's: on /stats the two sit in
+			     one card and their hour axes have to line up column-for-column. -->
+			<g transform="translate(36, 0)">
 				{#each putOnTicks as t}
 					<line x1="0" x2={PLOT_W} y1={PLOT_H - (t / putOnMax) * PLOT_H} y2={PLOT_H - (t / putOnMax) * PLOT_H} class="gridline" />
-					<text x="-6" y={PLOT_H - (t / putOnMax) * PLOT_H} class="ytick" text-anchor="end" dominant-baseline="middle">{t}</text>
+					<text x="-8" y={PLOT_H - (t / putOnMax) * PLOT_H} class="ytick" text-anchor="end" dominant-baseline="middle">{t}</text>
 				{/each}
 				<line x1="0" x2={PLOT_W} y1={PLOT_H} y2={PLOT_H} class="baseline" />
 				{#each putOnByHour as count, h}
@@ -64,13 +74,14 @@
 		</svg>
 	</section>
 
+	{#if wearingShareByHour && share}
 	<section>
 		<h3>Wearing share <span class="qualifier">— of tracked days</span></h3>
 		<svg viewBox="0 0 {PLOT_W + 40} {PLOT_H + 26}" role="img" aria-label="Share of days the watch was on the wrist, by hour of day">
-			<g transform="translate(30, 0)">
+			<g transform="translate(36, 0)">
 				{#each shareTicks as t}
 					<line x1="0" x2={PLOT_W} y1={PLOT_H - t * PLOT_H} y2={PLOT_H - t * PLOT_H} class="gridline" />
-					<text x="-6" y={PLOT_H - t * PLOT_H} class="ytick" text-anchor="end" dominant-baseline="middle">{Math.round(t * 100)}%</text>
+					<text x="-8" y={PLOT_H - t * PLOT_H} class="ytick" text-anchor="end" dominant-baseline="middle">{Math.round(t * 100)}%</text>
 				{/each}
 				<line x1="0" x2={PLOT_W} y1={PLOT_H} y2={PLOT_H} class="baseline" />
 				<path d={share.area} class="area" />
@@ -86,6 +97,7 @@
 			</g>
 		</svg>
 	</section>
+	{/if}
 </div>
 
 <style>
@@ -93,24 +105,10 @@
 		display: grid;
 		gap: 1.25rem;
 	}
-	.qualifier {
-		font-weight: 400;
-		text-transform: none;
-		letter-spacing: 0;
-	}
-
-	h3 {
-		font-family: var(--font-sans);
-		font-size: 0.8rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: var(--fg-muted);
-		margin: 0 0 0.35rem;
-	}
-	/* Axis chrome (.gridline/.baseline/.ytick/.xtick) comes from app.css, keyed
-	   off .chart-palette — this chart is single-series (no watch legend), but
-	   shares the same axis vocabulary as the multi-series charts. */
+	/* Axis chrome (.gridline/.baseline/.ytick/.xtick) and the panel-heading
+	   idiom (h3/.qualifier) come from app.css, keyed off .chart-palette — this
+	   chart is single-series (no watch legend), but shares the same vocabulary
+	   as the multi-series charts. */
 	svg {
 		width: 100%;
 		height: auto;

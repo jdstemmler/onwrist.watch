@@ -1,12 +1,10 @@
 <script lang="ts">
 	import { slotVar, stackOrder, niceTicks, OTHER_SLOT, OTHER_ID, OTHER_LABEL } from './palette';
+	import { WEEK, DOW_NAMES, DOW_INITIAL } from '$lib/week';
 
 	type Row = { dow: number; watchId: number; label: string; hours: number };
 
 	let { rows, colorSlots }: { rows: Row[]; colorSlots: Map<number, number> } = $props();
-
-	const DOW_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-	const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 	// Watches outside the top 11 (colorSlots === OTHER_SLOT) pool into one
 	// summed neutral "Other" band per day, stacked last.
@@ -70,15 +68,18 @@
 </script>
 
 <div class="chart-palette dow-chart">
-	<svg viewBox="0 0 {PLOT_W + 40} {PLOT_H + 30}" role="img" aria-label="Hours worn by day of week, stacked by watch">
+	<svg viewBox="0 0 {PLOT_W + 40} {PLOT_H + 30}" role="img" aria-label="Hours worn by day of week, Monday to Sunday, stacked by watch">
 		<g transform="translate(36, 0)">
 			{#each ticks as t}
 				<line x1="0" x2={PLOT_W} y1={PLOT_H - (t / niceMax) * PLOT_H} y2={PLOT_H - (t / niceMax) * PLOT_H} class="gridline" />
 				<text x="-8" y={PLOT_H - (t / niceMax) * PLOT_H} class="ytick" text-anchor="end" dominant-baseline="middle">{t}</text>
 			{/each}
 			<line x1="0" x2={PLOT_W} y1={PLOT_H} y2={PLOT_H} class="baseline" />
-			{#each byDow as day, i}
-				{@const segs = segmentsFor(day)}
+			<!-- byDow stays indexed by raw dow (0 = Sunday); WEEK supplies the
+			     Monday-first column order, so `i` is the screen position and
+			     `dow` is the bucket. -->
+			{#each WEEK as dow, i (dow)}
+				{@const segs = segmentsFor(byDow[dow])}
 				{@const cx = (i + 0.5) * COL}
 				{#each segs as seg (seg.watchId)}
 					{#if seg.height > 0}
@@ -90,11 +91,11 @@
 							rx="2"
 							fill={colorOf(seg.watchId)}
 						>
-							<title>{DOW_NAMES[i]} · {seg.label} · {fmtHours(seg.hours)}h</title>
+							<title>{DOW_NAMES[dow]} · {seg.label} · {fmtHours(seg.hours)}h</title>
 						</rect>
 					{/if}
 				{/each}
-				<text x={cx} y={PLOT_H + 18} class="xtick" text-anchor="middle">{DOW_LABELS[i]}</text>
+				<text x={cx} y={PLOT_H + 18} class="xtick" text-anchor="middle">{DOW_INITIAL[dow]}</text>
 			{/each}
 		</g>
 	</svg>

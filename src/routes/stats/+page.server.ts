@@ -1,6 +1,14 @@
 import type { PageServerLoad } from './$types';
 import { getDb } from '$lib/server/db';
-import { statsByDow, statsByTod, statsTodByWatch, statsByWatch, statsCalendar, statsSummary } from '$lib/server/stats';
+import {
+	statsByDow,
+	statsDowTod,
+	statsPutOnByHour,
+	statsTodByWatch,
+	statsByWatch,
+	statsCalendar,
+	statsSummary
+} from '$lib/server/stats';
 import { zonedParts } from '$lib/server/time';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
@@ -22,12 +30,25 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	const year = Number.isFinite(requested)
 		? Math.min(Math.max(Math.trunc(requested), firstYear), todayParts.year)
 		: todayParts.year;
-	const [byWatch, byDow, byTod, todByWatch, calendar] = await Promise.all([
+	const [byWatch, byDow, putOnByHour, dowTod, todByWatch, calendar] = await Promise.all([
 		statsByWatch(db, uid, tz, now),
 		statsByDow(db, uid, tz, now),
-		statsByTod(db, uid, tz, now),
+		statsPutOnByHour(db, uid, tz, now),
+		statsDowTod(db, uid, tz, now),
 		statsTodByWatch(db, uid, tz, now),
 		statsCalendar(db, uid, tz, year, now)
 	]);
-	return { year, summary, byWatch, byDow, byTod, todByWatch, calendar, firstDayKey, todayKey, nowIso: now.toISOString() };
+	return {
+		year,
+		summary,
+		byWatch,
+		byDow,
+		putOnByHour,
+		dowTod,
+		todByWatch,
+		calendar,
+		firstDayKey,
+		todayKey,
+		nowIso: now.toISOString()
+	};
 };

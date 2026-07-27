@@ -6,6 +6,16 @@ import { zonedParts } from './time';
 
 export type HourSlice = { hour: number; dow: number; dayKey: string; minutes: number };
 
+const DAY_MS = 86_400_000;
+
+/** `YYYY-MM-DD` → the UTC midnight of that calendar date. Day keys are already
+ * homeTz-local (see `zonedParts`), so UTC is just the arithmetic frame for
+ * walking and differencing them — never a timezone conversion. */
+function keyToUtc(k: string): number {
+	const [y, m, d] = k.split('-').map(Number);
+	return Date.UTC(y, m - 1, d);
+}
+
 export function sliceSession(startedAt: Date, endedAt: Date, tz: string): HourSlice[] {
 	const out: HourSlice[] = [];
 	let cursor = startedAt.getTime();
@@ -121,22 +131,62 @@ export async function statsTodByWatch(db: DB, userId: number, tz: string, now: D
 	});
 }
 
-export async function statsByTod(db: DB, userId: number, tz: string, now: Date) {
-	const { sessions, clamped } = await loadAll(db, userId, now);
+/** Count of sessions that *started* in each local hour — the "when do you strap
+ * one on" histogram. Deliberately not wrist-time: that lives in
+ * {@link statsDowTod} (share of the wrist) and {@link statsTodByWatch} (hours,
+ * split by watch), so the three time-of-day views answer three questions
+ * instead of restating one. */
+export async function statsPutOnByHour(db: DB, userId: number, tz: string, now: Date) {
+	const { sessions } = await loadAll(db, userId, now);
 	const putOnByHour = Array(24).fill(0);
 	for (const s of sessions) putOnByHour[zonedParts(s.startedAt, tz).hour]++;
+	return putOnByHour as number[];
+}
 
-	const minutesByHour = Array(24).fill(0);
+export type DowTodStats = {
+	/** [dow][hour] → fraction of that weekday's occurrences with a watch on. */
+	shares: number[][];
+	/** [dow][hour] → wrist-hours accumulated in that weekday-hour, all time. */
+	hours: number[][];
+	/** How many times each weekday has come around since tracking began. */
+	weekdayCounts: number[];
+};
+
+/**
+ * Wrist occupancy as a weekday × hour grid: for each of the 7×24 cells, what
+ * fraction of that weekday's occurrences had a watch on the wrist during that
+ * hour.
+ *
+ * The denominator is per-weekday on purpose — the number of Mondays, Tuesdays,
+ * ... between the first logged day and today (homeTz calendar days, so a
+ * partial final week doesn't dilute the weekdays it does contain). Dividing
+ * every cell by one global day count would understate whichever weekdays
+ * happen to have come around fewer times.
+ */
+export async function statsDowTod(db: DB, userId: number, tz: string, now: Date): Promise<DowTodStats> {
+	const { sessions, clamped } = await loadAll(db, userId, now);
+	const minutes: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
 	for (const s of clamped)
-		for (const slice of sliceSession(s.startedAt, s.endedAt, tz)) {
-			minutesByHour[slice.hour] += slice.minutes;
-		}
-	const first = sessions[0];
-	const daysObserved = first
-		? Math.max(1, Math.ceil((now.getTime() - first.startedAt.getTime()) / 86_400_000))
-		: 1;
-	const wearingShareByHour = minutesByHour.map((m) => m / (daysObserved * 60));
-	return { putOnByHour, wearingShareByHour };
+		for (const slice of sliceSession(s.startedAt, s.endedAt, tz))
+			minutes[slice.dow][slice.hour] += slice.minutes;
+
+	const weekdayCounts = Array(7).fill(0);
+	if (sessions.length) {
+		const start = keyToUtc(zonedParts(sessions[0].startedAt, tz).dayKey);
+		const end = keyToUtc(zonedParts(now, tz).dayKey);
+		for (let t = start; t <= end; t += DAY_MS) weekdayCounts[new Date(t).getUTCDay()]++;
+	}
+
+	return {
+		// Clamped at 1: the one-watch-at-a-time invariant caps a cell at 60
+		// minutes per occurrence, except on a DST fall-back day where the local
+		// hour runs twice. That's a repeated hour, not 120% occupancy.
+		shares: minutes.map((row, dow) =>
+			row.map((m) => (weekdayCounts[dow] ? Math.min(1, m / (weekdayCounts[dow] * 60)) : 0))
+		),
+		hours: minutes.map((row) => row.map((m) => m / 60)),
+		weekdayCounts
+	};
 }
 
 export type WatchDetailStats = {
@@ -153,13 +203,6 @@ export type WatchDetailStats = {
 	firstWornDayKey: string | null;
 	trackingSinceDayKey: string | null;
 };
-
-const DAY_MS = 86_400_000;
-
-function keyToUtc(k: string): number {
-	const [y, m, d] = k.split('-').map(Number);
-	return Date.UTC(y, m - 1, d);
-}
 
 export async function statsWatchDetail(
 	db: DB,

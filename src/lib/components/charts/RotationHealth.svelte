@@ -100,23 +100,14 @@
 <style>
 	/* dataviz palette — --series-N custom properties are declared once in
 	   src/routes/stats/+page.svelte; this component only references var(--series-N)
-	   via slotVar(). Base .swatch sizing comes from app.css, keyed off
-	   .chart-palette; this component only adds flex: none since its swatches
+	   via slotVar(). Base .swatch sizing and the h3 panel-heading idiom come from
+	   app.css, keyed off .chart-palette; this component only adds flex: none since its swatches
 	   sit inline in flex rows (list items, table cells) that would otherwise
 	   shrink them. */
 
 	.rotation-health {
 		display: grid;
 		gap: 1.5rem;
-	}
-	h3 {
-		font-family: var(--font-sans);
-		font-size: 0.8rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: var(--fg-muted);
-		margin: 0 0 0.5rem;
 	}
 	.rotation-health .swatch {
 		flex: none;
